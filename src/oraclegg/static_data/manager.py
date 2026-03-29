@@ -19,35 +19,48 @@ MERAKI_ITEMS_URL = "https://cdn.merakianalytics.com/riot/lol/resources/latest/en
 
 
 async def get_latest_patch() -> str:
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=15.0) as client:
         resp = await client.get(DDRAGON_VERSIONS_URL)
+        resp.raise_for_status()
         versions = resp.json()
+        if not versions:
+            raise RuntimeError("DDragon returned empty version list")
         return versions[0]
 
 
 async def fetch_ddragon_champions(patch: str) -> dict:
     url = f"{DDRAGON_BASE}/{patch}/data/en_US/champion.json"
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.get(url)
-        return resp.json()["data"]
+        resp.raise_for_status()
+        data = resp.json()
+        if "data" not in data:
+            raise RuntimeError(f"Unexpected DDragon champion response for patch {patch}")
+        return data["data"]
 
 
 async def fetch_ddragon_items(patch: str) -> dict:
     url = f"{DDRAGON_BASE}/{patch}/data/en_US/item.json"
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.get(url)
-        return resp.json()["data"]
+        resp.raise_for_status()
+        data = resp.json()
+        if "data" not in data:
+            raise RuntimeError(f"Unexpected DDragon item response for patch {patch}")
+        return data["data"]
 
 
 async def fetch_meraki_champions() -> dict:
     async with httpx.AsyncClient(timeout=60.0) as client:
         resp = await client.get(MERAKI_CHAMPIONS_URL)
+        resp.raise_for_status()
         return resp.json()
 
 
 async def fetch_meraki_items() -> dict:
     async with httpx.AsyncClient(timeout=60.0) as client:
         resp = await client.get(MERAKI_ITEMS_URL)
+        resp.raise_for_status()
         return resp.json()
 
 

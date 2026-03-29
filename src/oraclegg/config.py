@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     riot_api_key: str = "RGAPI-change-me"
     riot_region: str = "americas"  # americas, europe, asia, sea
     riot_platform: str = "la1"  # na1, la1, la2, euw1, kr, etc.
-    summoner_riot_id: str = "Mistyck#Lan"
+    summoner_riot_id: str = ""
 
     # League client path (auto-detected if empty)
     lcu_path: str = ""
@@ -45,9 +45,17 @@ class Settings(BaseSettings):
 
     @property
     def db_url(self) -> str:
-        path = Path(self.db_path)
+        path = Path(self.db_path).resolve()
         path.parent.mkdir(parents=True, exist_ok=True)
         return f"sqlite+aiosqlite:///{path}"
+
+    @property
+    def api_key_configured(self) -> bool:
+        return bool(self.riot_api_key) and self.riot_api_key != "RGAPI-change-me"
+
+    @property
+    def summoner_configured(self) -> bool:
+        return bool(self.summoner_riot_id) and "#" in self.summoner_riot_id
 
     @property
     def riot_base_url(self) -> str:
@@ -61,11 +69,15 @@ class Settings(BaseSettings):
 
     @property
     def summoner_name(self) -> str:
+        if not self.summoner_riot_id:
+            return ""
         return self.summoner_riot_id.split("#")[0]
 
     @property
     def summoner_tag(self) -> str:
-        return self.summoner_riot_id.split("#")[1] if "#" in self.summoner_riot_id else ""
+        if "#" not in self.summoner_riot_id:
+            return ""
+        return self.summoner_riot_id.split("#")[1]
 
 
 settings = Settings()

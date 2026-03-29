@@ -12,6 +12,61 @@
         <p class="text-oracle-text mt-2">Real-time League of Legends coaching</p>
     </div>
 
+    <!-- Getting started banner -->
+    {% if not api_key_set or build_count == 0 %}
+    <div class="bg-oracle-card border border-oracle-gold/30 rounded-lg p-6 glow">
+        <h2 class="text-oracle-gold font-bold text-lg mb-3">Getting Started</h2>
+        <div class="space-y-3 text-sm">
+            {% if not api_key_set %}
+            <div class="flex items-start gap-3">
+                <span class="bg-oracle-red/20 text-oracle-red text-xs px-2 py-0.5 rounded-full border border-oracle-red/30 shrink-0 mt-0.5">REQUIRED</span>
+                <div>
+                    <span class="text-oracle-light font-medium">Set your Riot API key</span>
+                    <p class="text-oracle-text/60 text-xs mt-0.5">
+                        Get a free key at <a href="https://developer.riotgames.com/" target="_blank" class="text-oracle-blue hover:underline">developer.riotgames.com</a>,
+                        then go to <a href="/settings" class="text-oracle-gold hover:underline">Settings</a> to save it. Dev keys expire every 24 hours.
+                    </p>
+                </div>
+            </div>
+            {% endif %}
+            {% if not summoner_set %}
+            <div class="flex items-start gap-3">
+                <span class="bg-oracle-gold/20 text-oracle-gold text-xs px-2 py-0.5 rounded-full border border-oracle-gold/30 shrink-0 mt-0.5">SETUP</span>
+                <div>
+                    <span class="text-oracle-light font-medium">Set your Summoner name</span>
+                    <p class="text-oracle-text/60 text-xs mt-0.5">
+                        Go to <a href="/settings" class="text-oracle-gold hover:underline">Settings</a> and enter your Riot ID (Name#Tag) for personal tracking.
+                    </p>
+                </div>
+            </div>
+            {% endif %}
+            {% if champion_count == 0 %}
+            <div class="flex items-start gap-3">
+                <span class="bg-oracle-red/20 text-oracle-red text-xs px-2 py-0.5 rounded-full border border-oracle-red/30 shrink-0 mt-0.5">REQUIRED</span>
+                <div>
+                    <span class="text-oracle-light font-medium">Seed champion &amp; item data</span>
+                    <p class="text-oracle-text/60 text-xs mt-0.5">
+                        Run: <code class="bg-oracle-bg px-1.5 py-0.5 rounded text-oracle-gold text-xs">uv run python scripts/seed_static_data.py</code>
+                    </p>
+                </div>
+            </div>
+            {% endif %}
+            {% if build_count == 0 and champion_count > 0 and api_key_set %}
+            <div class="flex items-start gap-3">
+                <span class="bg-oracle-blue/20 text-oracle-blue text-xs px-2 py-0.5 rounded-full border border-oracle-blue/30 shrink-0 mt-0.5">NEXT</span>
+                <div>
+                    <span class="text-oracle-light font-medium">Run the data pipeline</span>
+                    <p class="text-oracle-text/60 text-xs mt-0.5">
+                        Run: <code class="bg-oracle-bg px-1.5 py-0.5 rounded text-oracle-gold text-xs">uv run python scripts/run_pipeline.py --players 50 --min-sample 5</code>
+                        <br>This collects Master+ match data and generates build recommendations. Takes 2-5 minutes with a dev key.
+                    </p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Stats cards -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div class="bg-oracle-card border border-oracle-border rounded-lg p-6 glow">

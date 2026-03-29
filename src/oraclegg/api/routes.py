@@ -69,6 +69,8 @@ async def dashboard(request: Request):
     return templates.TemplateResponse(request, "dashboard.html", {
         "build_count": agg_count.scalar(),
         "champion_count": champ_count.scalar(),
+        "api_key_set": settings.api_key_configured,
+        "summoner_set": settings.summoner_configured,
     })
 
 

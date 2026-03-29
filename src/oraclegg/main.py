@@ -26,7 +26,12 @@ async def lifespan(app: FastAPI):
     monitor_task = asyncio.create_task(game_monitor_loop())
 
     print(f"\n  OracleGG running at http://{settings.host}:{settings.port}")
-    print(f"  Game monitor active (polling every {settings.live_client_poll_interval}s)\n")
+    print(f"  Game monitor active (polling every {settings.live_client_poll_interval}s)")
+    if not settings.api_key_configured:
+        print("  WARNING: Riot API key not configured — set it in Settings or .env")
+    if not settings.summoner_configured:
+        print("  WARNING: Summoner not configured — set it in Settings for post-game tracking")
+    print()
     yield
 
     monitor_task.cancel()

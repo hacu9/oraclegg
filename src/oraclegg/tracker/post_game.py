@@ -24,6 +24,9 @@ async def analyze_post_game(client: RiotClient) -> dict | None:
     """
     try:
         # Get our account
+        if not settings.summoner_configured:
+            logger.warning("Summoner not configured — skipping post-game analysis")
+            return None
         name, tag = settings.summoner_riot_id.split("#")
         account = await client.get_account_by_riot_id(name, tag)
         puuid = account.puuid

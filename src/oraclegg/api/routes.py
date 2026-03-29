@@ -1,8 +1,24 @@
 """FastAPI routes for OracleGG."""
 
 import json
+import logging
 
 from fastapi import APIRouter, Query, Request
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.templating import Jinja2Templates
+from sqlalchemy import select, func
+
+from oraclegg.config import settings
+from oraclegg.db.engine import async_session
+from oraclegg.db.models import BuildAggregate, Champion, Item
+from oraclegg.recommender.builds import recommend_build, recommend_for_matchup
+from oraclegg.riot.client import RiotClient, RiotAPIError
+from oraclegg.scouting.scout import scout_player, scout_team
+from oraclegg.scouting.comp import classify_comp_from_ids
+
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # Champions whose Live Client name differs from Data Dragon key
 CHAMP_ICON_MAP = {
@@ -19,22 +35,13 @@ CHAMP_ICON_MAP = {
     "K'Sante": "KSante",
     "LeBlanc": "Leblanc",
 }
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
-from sqlalchemy import select, func
-
-from oraclegg.db.engine import async_session
-from oraclegg.db.models import BuildAggregate, Champion, Item
-from oraclegg.recommender.builds import recommend_build, recommend_for_matchup
-from oraclegg.riot.client import RiotClient
-from oraclegg.scouting.scout import scout_player, scout_team
-from oraclegg.scouting.comp import classify_comp_from_ids
-
-from pathlib import Path
 
 router = APIRouter()
 _templates_dir = Path(__file__).parent.parent / "ui" / "templates"
 templates = Jinja2Templates(directory=str(_templates_dir))
+
+# Template global: dynamic DDragon base URL
+templates.env.globals["ddragon_base"] = lambda: settings.ddragon_base
 
 # Singleton Riot client — shared across requests for rate limiting
 _riot_client: "RiotClient | None" = None
@@ -52,7 +59,6 @@ def get_riot_client() -> "RiotClient":
 @router.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
     async with async_session() as session:
-        # Get stats
         agg_count = await session.execute(
             select(func.count()).select_from(BuildAggregate)
         )
@@ -98,17 +104,19 @@ async def get_recommendation(
     role: str = Query(...),
     enemy_ids: str = Query(default=""),
 ):
-    """Get build recommendation for a champion vs enemy team.
-
-    enemy_ids: comma-separated champion IDs (e.g., "86,238,64,222,412")
-    """
-    if enemy_ids:
-        enemy_champion_ids = [int(x) for x in enemy_ids.split(",") if x]
-        result = await recommend_for_matchup(champion_id, role, enemy_champion_ids)
-    else:
-        result = await recommend_build(champion_id, role, ["balanced"])
-
-    return result
+    """Get build recommendation for a champion vs enemy team."""
+    try:
+        if enemy_ids:
+            enemy_champion_ids = [int(x) for x in enemy_ids.split(",") if x]
+            result = await recommend_for_matchup(champion_id, role, enemy_champion_ids)
+        else:
+            result = await recommend_build(champion_id, role, ["balanced"])
+        return result
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
+    except Exception as e:
+        logger.error(f"Recommendation error: {e}")
+        return JSONResponse(status_code=500, content={"error": "Failed to generate recommendation. Check that pipeline data has been collected."})
 
 
 @router.get("/api/recommend/html", response_class=HTMLResponse)
@@ -119,15 +127,23 @@ async def get_recommendation_html(
     enemy_ids: str = Query(default=""),
 ):
     """Get build recommendation as HTML partial (for HTMX)."""
-    if enemy_ids:
-        enemy_champion_ids = [int(x) for x in enemy_ids.split(",") if x]
-        rec = await recommend_for_matchup(champion_id, role, enemy_champion_ids)
-    else:
-        rec = await recommend_build(champion_id, role, ["balanced"])
+    try:
+        if enemy_ids:
+            enemy_champion_ids = [int(x) for x in enemy_ids.split(",") if x]
+            rec = await recommend_for_matchup(champion_id, role, enemy_champion_ids)
+        else:
+            rec = await recommend_build(champion_id, role, ["balanced"])
 
-    return templates.TemplateResponse(request, "partials/build_panel.html", {
-        "rec": rec,
-    })
+        return templates.TemplateResponse(request, "partials/build_panel.html", {
+            "rec": rec,
+        })
+    except Exception as e:
+        logger.error(f"Recommendation HTML error: {e}")
+        return HTMLResponse(
+            '<div class="text-oracle-red text-sm p-3 bg-oracle-bg rounded border border-oracle-red/30">'
+            'Failed to load build recommendation. Make sure pipeline data has been collected.'
+            '</div>'
+        )
 
 
 @router.get("/api/scout")
@@ -137,15 +153,27 @@ async def scout_summoner(
     champion_id: int | None = Query(default=None),
 ):
     """Scout a single summoner by Riot ID."""
-    client = get_riot_client()
-    account = await client.get_account_by_riot_id(name, tag)
-    report = await scout_player(
-        client, account.puuid,
-        game_name=account.gameName,
-        tag_line=account.tagLine,
-        current_champion_id=champion_id,
-    )
-    return report
+    try:
+        client = get_riot_client()
+        account = await client.get_account_by_riot_id(name, tag)
+        report = await scout_player(
+            client, account.puuid,
+            game_name=account.gameName,
+            tag_line=account.tagLine,
+            current_champion_id=champion_id,
+        )
+        return report
+    except RiotAPIError as e:
+        if e.status_code == 404:
+            return JSONResponse(status_code=404, content={"error": f"Player '{name}#{tag}' not found."})
+        elif e.status_code == 401 or e.status_code == 403:
+            return JSONResponse(status_code=401, content={"error": "Invalid or expired API key. Update it in Settings."})
+        elif e.status_code == 429:
+            return JSONResponse(status_code=429, content={"error": "Rate limited. Please wait a moment and try again."})
+        return JSONResponse(status_code=502, content={"error": f"Riot API error: {e}"})
+    except Exception as e:
+        logger.error(f"Scout error for {name}#{tag}: {e}")
+        return JSONResponse(status_code=500, content={"error": "Failed to scout player. Check your API key and connection."})
 
 
 @router.get("/api/scout/html", response_class=HTMLResponse)
@@ -156,17 +184,35 @@ async def scout_summoner_html(
     champion_id: int | None = Query(default=None),
 ):
     """Scout a summoner and return HTML partial."""
-    client = get_riot_client()
-    account = await client.get_account_by_riot_id(name, tag)
-    report = await scout_player(
-        client, account.puuid,
-        game_name=account.gameName,
-        tag_line=account.tagLine,
-        current_champion_id=champion_id,
-    )
-    return templates.TemplateResponse(request, "partials/scouting_card.html", {
-        "player": report,
-    })
+    try:
+        client = get_riot_client()
+        account = await client.get_account_by_riot_id(name, tag)
+        report = await scout_player(
+            client, account.puuid,
+            game_name=account.gameName,
+            tag_line=account.tagLine,
+            current_champion_id=champion_id,
+        )
+        return templates.TemplateResponse(request, "partials/scouting_card.html", {
+            "player": report,
+        })
+    except RiotAPIError as e:
+        if e.status_code == 404:
+            error_msg = f"Player '{name}#{tag}' not found. Check the name and tag."
+        elif e.status_code == 401 or e.status_code == 403:
+            error_msg = "Invalid or expired API key. Update it in Settings."
+        elif e.status_code == 429:
+            error_msg = "Rate limited. Please wait a moment and try again."
+        else:
+            error_msg = f"Riot API error ({e.status_code}). Try again later."
+        return templates.TemplateResponse(request, "partials/scouting_card.html", {
+            "player": {"error": error_msg},
+        })
+    except Exception as e:
+        logger.error(f"Scout HTML error for {name}#{tag}: {e}")
+        return templates.TemplateResponse(request, "partials/scouting_card.html", {
+            "player": {"error": "Failed to scout player. Check your API key and connection."},
+        })
 
 
 @router.get("/settings", response_class=HTMLResponse)
@@ -234,7 +280,6 @@ async def apply_update(request: Request):
 @router.get("/api/settings/account")
 async def get_account_settings():
     """Get current API key status and summoner info."""
-    from oraclegg.config import settings
     key = settings.riot_api_key
     return {
         "api_key_set": key and key != "RGAPI-change-me",
@@ -264,15 +309,12 @@ async def save_api_key(request: Request):
                 headers={"X-Riot-Token": key},
                 timeout=5,
             )
-            # 401 = bad key, 403 = good key but this endpoint needs auth
-            # Any non-401 means the key is valid
             if r.status_code == 401:
                 return {"valid": False, "error": "Invalid or expired key"}
     except Exception as e:
         return {"valid": False, "error": str(e)}
 
     # Save to .env file
-    from pathlib import Path
     env_path = Path(".env")
     if env_path.exists():
         content = env_path.read_text()
@@ -286,13 +328,11 @@ async def save_api_key(request: Request):
         env_path.write_text(f"RIOT_API_KEY={key}\n")
 
     # Hot-reload the key into the running app
-    from oraclegg.config import settings
     settings.riot_api_key = key
 
     # Update the singleton client
     global _riot_client
-    _riot_client = None  # Will be recreated with new key on next use
-
+    _riot_client = None
     return {"valid": True}
 
 
@@ -309,7 +349,6 @@ async def save_summoner(request: Request):
     riot_id = f"{name}#{tag}"
 
     # Save to .env
-    from pathlib import Path
     import re
     env_path = Path(".env")
     if env_path.exists():
@@ -321,9 +360,7 @@ async def save_summoner(request: Request):
         env_path.write_text(content)
 
     # Hot-reload
-    from oraclegg.config import settings
     settings.summoner_riot_id = riot_id
-
     return {"ok": True}
 
 
@@ -334,10 +371,14 @@ async def get_boot_recommendation(
     enemies: str = Query(..., description="Comma-separated enemy champion names"),
 ):
     """Get boot recommendation based on enemy team."""
-    from oraclegg.recommender.rules.boots_rules import recommend_boots
-    enemy_list = [e.strip() for e in enemies.split(",") if e.strip()]
-    rec = recommend_boots(champion, role, enemy_list, {})
-    return rec
+    try:
+        from oraclegg.recommender.rules.boots_rules import recommend_boots
+        enemy_list = [e.strip() for e in enemies.split(",") if e.strip()]
+        rec = recommend_boots(champion, role, enemy_list, {})
+        return rec
+    except Exception as e:
+        logger.error(f"Boot recommendation error: {e}")
+        return JSONResponse(status_code=500, content={"error": "Failed to generate boot recommendation."})
 
 
 @router.get("/api/dragon")
@@ -347,10 +388,14 @@ async def get_dragon_value(
     enemies: str = Query(..., description="Comma-separated enemy champion names"),
 ):
     """Evaluate dragon value for the current game."""
-    from oraclegg.recommender.rules.dragon_rules import evaluate_dragon
-    ally_list = [a.strip() for a in allies.split(",") if a.strip()]
-    enemy_list = [e.strip() for e in enemies.split(",") if e.strip()]
-    return evaluate_dragon(dragon_type, ally_list, enemy_list)
+    try:
+        from oraclegg.recommender.rules.dragon_rules import evaluate_dragon
+        ally_list = [a.strip() for a in allies.split(",") if a.strip()]
+        enemy_list = [e.strip() for e in enemies.split(",") if e.strip()]
+        return evaluate_dragon(dragon_type, ally_list, enemy_list)
+    except Exception as e:
+        logger.error(f"Dragon evaluation error: {e}")
+        return JSONResponse(status_code=500, content={"error": "Failed to evaluate dragon value."})
 
 
 @router.get("/api/comp/classify")
@@ -358,10 +403,14 @@ async def classify_team_comp(
     champion_ids: str = Query(..., description="Comma-separated champion IDs"),
 ):
     """Classify a team composition into archetypes."""
-    ids = [int(x) for x in champion_ids.split(",") if x]
-    async with async_session() as session:
-        archetypes = await classify_comp_from_ids(ids, session)
-    return {"champion_ids": ids, "archetypes": archetypes}
+    try:
+        ids = [int(x) for x in champion_ids.split(",") if x]
+        async with async_session() as session:
+            archetypes = await classify_comp_from_ids(ids, session)
+        return {"champion_ids": ids, "archetypes": archetypes}
+    except Exception as e:
+        logger.error(f"Comp classification error: {e}")
+        return JSONResponse(status_code=500, content={"error": "Failed to classify team composition."})
 
 
 @router.get("/api/stats")
@@ -378,7 +427,6 @@ async def pipeline_stats():
             select(func.count()).select_from(Item)
         )).scalar()
 
-        # Most covered champions
         top_champs = (await session.execute(
             select(
                 BuildAggregate.champion_id,
@@ -417,6 +465,7 @@ async def get_game_state():
         "phase": game_state["phase"],
         "game_time": round(game_state.get("game_time", 0), 1),
         "active_player": game_state.get("active_player"),
+        "ddragon": settings.ddragon_base,
         "players": [
             {
                 "name": p.get("riotIdGameName", p.get("summonerName", "")),
@@ -424,6 +473,7 @@ async def get_game_state():
                 "championIcon": CHAMP_ICON_MAP.get(p.get("championName", ""), p.get("championName", "")),
                 "team": p.get("team", ""),
                 "level": p.get("level", 0),
+                "position": p.get("position", ""),
                 "isDead": p.get("isDead", False),
                 "respawnTimer": p.get("respawnTimer", 0),
                 "scores": p.get("scores", {}),
@@ -442,6 +492,17 @@ async def get_game_state():
         "next_dragon": game_state.get("next_dragon", "Unknown"),
         "dragons_taken": game_state.get("dragons_taken", 0),
         "last_update": game_state.get("last_update"),
+        # Enhanced game intelligence (populated on game start)
+        "your_champion": game_state.get("your_champion"),
+        "your_champion_icon": game_state.get("your_champion_icon"),
+        "your_role": game_state.get("your_role"),
+        "enemy_archetypes": game_state.get("enemy_archetypes", []),
+        "build_rec": game_state.get("build_rec"),
+        "strategy": game_state.get("strategy", ""),
+        "lane_matchups": game_state.get("lane_matchups", []),
+        "runes": game_state.get("runes"),
+        "summoner_spells": game_state.get("summoner_spells", []),
+        "win_condition": game_state.get("win_condition", []),
     }
 
 
@@ -454,35 +515,55 @@ async def tracking_page(request: Request):
 
 @router.get("/api/tracking/matches")
 async def tracking_matches():
-    from oraclegg.tracker.personal import get_recent_matches
-    return await get_recent_matches(20)
+    try:
+        from oraclegg.tracker.personal import get_recent_matches
+        return await get_recent_matches(20)
+    except Exception as e:
+        logger.error(f"Tracking matches error: {e}")
+        return JSONResponse(status_code=500, content={"error": "Failed to load match history."})
 
 
 @router.get("/api/tracking/champions")
 async def tracking_champions():
-    from oraclegg.tracker.personal import get_champion_stats
-    return await get_champion_stats()
+    try:
+        from oraclegg.tracker.personal import get_champion_stats
+        return await get_champion_stats()
+    except Exception as e:
+        logger.error(f"Tracking champions error: {e}")
+        return JSONResponse(status_code=500, content={"error": "Failed to load champion stats."})
 
 
 @router.get("/api/tracking/overview")
 async def tracking_overview():
-    from oraclegg.tracker.personal import get_overall_stats
-    return await get_overall_stats()
+    try:
+        from oraclegg.tracker.personal import get_overall_stats
+        return await get_overall_stats()
+    except Exception as e:
+        logger.error(f"Tracking overview error: {e}")
+        return JSONResponse(status_code=500, content={"error": "Failed to load overview stats."})
 
 
 @router.get("/api/tracking/analysis/{match_id}")
 async def match_analysis(match_id: str):
     """Get AI analysis for a specific match."""
-    from oraclegg.tracker.ai_analysis import get_or_generate_analysis
-    result = await get_or_generate_analysis(match_id)
-    if not result:
-        return {"error": "Match not found"}
-    return result
+    try:
+        from oraclegg.tracker.ai_analysis import get_or_generate_analysis
+        result = await get_or_generate_analysis(match_id)
+        if not result:
+            return {"error": "Match not found"}
+        return result
+    except Exception as e:
+        logger.error(f"Match analysis error for {match_id}: {e}")
+        return JSONResponse(status_code=500, content={"error": "Failed to generate match analysis."})
 
 
 @router.post("/api/tracking/analyze-all")
 async def analyze_all_matches():
     """Generate analysis for all matches without one."""
-    from oraclegg.tracker.ai_analysis import generate_all_analyses
-    count = await generate_all_analyses()
-    return {"analyzed": count}
+    try:
+        from oraclegg.tracker.ai_analysis import generate_all_analyses
+        count = await generate_all_analyses()
+        return {"analyzed": count}
+    except Exception as e:
+        logger.error(f"Analyze all error: {e}")
+        return JSONResponse(status_code=500, content={"error": "Failed to analyze matches."})

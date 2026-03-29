@@ -12,6 +12,15 @@ from oraclegg.db.engine import init_db
 async def lifespan(app: FastAPI):
     await init_db()
 
+    # Fetch latest DDragon patch version
+    try:
+        from oraclegg.static_data.manager import get_latest_patch
+        patch = await get_latest_patch()
+        settings.ddragon_version = patch
+        print(f"  DDragon version: {patch}")
+    except Exception:
+        print(f"  DDragon version: {settings.ddragon_version} (default, fetch failed)")
+
     # Start background game monitor
     from oraclegg.game_loop.monitor import game_monitor_loop
     monitor_task = asyncio.create_task(game_monitor_loop())

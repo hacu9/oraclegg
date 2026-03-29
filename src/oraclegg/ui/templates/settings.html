@@ -75,13 +75,13 @@
         <p class="text-oracle-text/60 text-sm mb-4">Only show tips at or above this priority level.</p>
 
         <div class="flex gap-3">
-            <button class="prio-btn px-4 py-2 rounded border text-sm font-medium transition-colors" data-prio="0">
+            <button class="prio-btn px-4 py-2 rounded border text-sm font-medium transition-colors" data-prio="all">
                 All Tips
             </button>
-            <button class="prio-btn px-4 py-2 rounded border text-sm font-medium transition-colors" data-prio="1">
+            <button class="prio-btn px-4 py-2 rounded border text-sm font-medium transition-colors" data-prio="important">
                 Important + Urgent
             </button>
-            <button class="prio-btn px-4 py-2 rounded border text-sm font-medium transition-colors" data-prio="0">
+            <button class="prio-btn px-4 py-2 rounded border text-sm font-medium transition-colors" data-prio="urgent">
                 Urgent Only
             </button>
         </div>
@@ -284,29 +284,29 @@ document.querySelectorAll('[data-setting]').forEach(cb => {
 });
 
 // Priority buttons
-document.querySelectorAll('.prio-btn').forEach((btn, i) => {
-    const vals = [0, 1, 0]; // All, Important+, Urgent
-    const labels = ['all', 'important', 'urgent'];
-    if (i === 0 && settings.min_priority === 0) btn.classList.add('active');
-    if (i === 1 && settings.min_priority === 1) btn.classList.add('active');
-    if (i === 2 && settings.min_priority === 0 && settings.urgent_only) btn.classList.add('active');
+document.querySelectorAll('.prio-btn').forEach(btn => {
+    const mode = btn.dataset.prio;
+
+    // Set initial active state
+    if (mode === 'urgent' && settings.urgent_only) btn.classList.add('active');
+    else if (mode === 'important' && settings.min_priority === 1 && !settings.urgent_only) btn.classList.add('active');
+    else if (mode === 'all' && settings.min_priority === 0 && !settings.urgent_only) btn.classList.add('active');
 
     btn.addEventListener('click', () => {
         document.querySelectorAll('.prio-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        if (i === 2) {
+        if (mode === 'urgent') {
             settings.min_priority = 0;
             settings.urgent_only = true;
+        } else if (mode === 'important') {
+            settings.min_priority = 1;
+            settings.urgent_only = false;
         } else {
-            settings.min_priority = vals[i];
+            settings.min_priority = 0;
             settings.urgent_only = false;
         }
         saveSettings(settings);
     });
 });
-
-// Set initial active state
-const activePrio = settings.urgent_only ? 2 : (settings.min_priority === 1 ? 1 : 0);
-document.querySelectorAll('.prio-btn')[activePrio]?.classList.add('active');
 </script>
 {% endblock %}

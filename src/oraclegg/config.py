@@ -32,9 +32,16 @@ class Settings(BaseSettings):
     pipeline_matches_per_player: int = 10
     pipeline_min_sample_size: int = 30
 
+    # DDragon (updated on startup)
+    ddragon_version: str = "14.10.1"
+
     # Server
     host: str = "127.0.0.1"
     port: int = 8000
+
+    @property
+    def ddragon_base(self) -> str:
+        return f"https://ddragon.leagueoflegends.com/cdn/{self.ddragon_version}/img"
 
     @property
     def db_url(self) -> str:

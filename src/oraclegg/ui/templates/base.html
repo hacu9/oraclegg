@@ -54,12 +54,18 @@
                 <span class="text-oracle-gold font-bold text-xl tracking-wide">ORACLE</span>
                 <span class="text-oracle-blue font-light text-xl">.GG</span>
             </a>
-            <div class="flex gap-6 text-sm">
+            <div class="flex items-center gap-6 text-sm">
                 <a href="/" class="hover:text-oracle-light transition-colors {% block nav_dashboard %}{% endblock %}">Dashboard</a>
                 <a href="/champ-select" class="hover:text-oracle-light transition-colors {% block nav_champ_select %}{% endblock %}">Champ Select</a>
                 <a href="/in-game" class="hover:text-oracle-light transition-colors {% block nav_in_game %}{% endblock %}">In-Game</a>
                 <a href="/tracking" class="hover:text-oracle-light transition-colors {% block nav_tracking %}{% endblock %}">Tracking</a>
                 <a href="/settings" class="hover:text-oracle-light transition-colors {% block nav_settings %}{% endblock %}">Settings</a>
+                <!-- Live match indicator -->
+                <a href="/in-game" id="live-indicator" style="display:none"
+                   class="flex items-center gap-1.5 bg-oracle-red/20 border border-oracle-red/40 text-oracle-red px-3 py-1 rounded-full text-xs font-bold ml-2">
+                    <span class="w-2 h-2 rounded-full bg-oracle-red animate-pulse"></span>
+                    LIVE MATCH DETECTED
+                </a>
             </div>
         </div>
     </nav>
@@ -87,6 +93,16 @@
     </main>
 
     <script>
+    // Live match indicator — poll game state
+    function checkLiveMatch() {
+        fetch('/api/game-state').then(r=>r.json()).then(s=>{
+            const el = document.getElementById('live-indicator');
+            if (el) el.style.display = s.phase === 'in_game' ? 'flex' : 'none';
+        }).catch(()=>{});
+    }
+    checkLiveMatch();
+    setInterval(checkLiveMatch, 5000);
+
     // Check for updates on page load
     fetch('/api/update/check').then(r=>r.json()).then(d=>{
         if(d.available && d.url){

@@ -60,7 +60,9 @@
 </div>
 
 <script>
-const DDRAGON = 'https://ddragon.leagueoflegends.com/cdn/16.6.1/img';
+let DDRAGON = '{{ ddragon_base() }}';
+// Fallback if template variable not available
+if (DDRAGON.includes('{')) DDRAGON = 'https://ddragon.leagueoflegends.com/cdn/14.10.1/img';
 
 const CHAMP_ICON_MAP = {
     'MonkeyKing': 'MonkeyKing', 'Wukong': 'MonkeyKing',

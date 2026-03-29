@@ -53,8 +53,11 @@
     <div class="grid grid-cols-12 gap-3 mb-3">
         <!-- WIN CONDITION -->
         <div class="col-span-3 bg-oracle-card border border-oracle-border rounded-lg p-4">
-            <h2 class="text-oracle-text text-xs uppercase tracking-wider font-semibold mb-3">Your Win Condition</h2>
-            <div id="win-condition" class="space-y-3">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-oracle-text text-xs uppercase tracking-wider font-semibold">Win Condition</h2>
+                <span id="scouting-badge" class="text-[10px] px-1.5 py-0.5 rounded-full hidden"></span>
+            </div>
+            <div id="win-condition" class="space-y-2.5">
                 <div class="text-oracle-text/50 text-sm">Analyzing...</div>
             </div>
         </div>
@@ -63,13 +66,12 @@
         <div class="col-span-5 bg-oracle-card border border-oracle-border rounded-lg p-4">
             <div class="flex items-center justify-between mb-3">
                 <h2 class="text-oracle-text text-xs uppercase tracking-wider font-semibold">Team Matchup</h2>
-                <span id="win-prob" class="text-xs px-2 py-0.5 rounded-full hidden"></span>
             </div>
             <div class="flex justify-between text-oracle-text/50 text-[10px] uppercase tracking-wider mb-2 px-2">
                 <span>Allied team</span>
                 <span>Enemy team</span>
             </div>
-            <div id="lane-matchups" class="space-y-1.5">
+            <div id="lane-matchups" class="space-y-1">
                 <div class="text-oracle-text/50 text-sm text-center py-4">Waiting for game data...</div>
             </div>
         </div>
@@ -138,7 +140,6 @@
 <script>
 let DDRAGON = '';
 
-// Summoner spell name → DDragon key mapping
 const SPELL_MAP = {
     'Flash': 'SummonerFlash', 'Ignite': 'SummonerDot', 'Teleport': 'SummonerTeleport',
     'Smite': 'SummonerSmite', 'Exhaust': 'SummonerExhaust', 'Heal': 'SummonerHeal',
@@ -157,18 +158,32 @@ function formatTime(secs) {
 }
 
 const RATING_STYLES = {
-    'POSITIVE': { bg: 'bg-oracle-green/20', text: 'text-oracle-green', border: 'border-oracle-green/30', label: 'POSITIVE' },
-    'EVEN':     { bg: 'bg-oracle-gold/20', text: 'text-oracle-gold', border: 'border-oracle-gold/30', label: 'EVEN' },
-    'NEGATIVE': { bg: 'bg-oracle-red/20', text: 'text-oracle-red', border: 'border-oracle-red/30', label: 'NEGATIVE' },
+    'POSITIVE': { bg: 'bg-oracle-green/15', text: 'text-oracle-green', border: 'border-oracle-green/30', label: 'POSITIVE' },
+    'EVEN':     { bg: 'bg-oracle-gold/15', text: 'text-oracle-gold', border: 'border-oracle-gold/30', label: 'EVEN' },
+    'NEGATIVE': { bg: 'bg-oracle-red/15', text: 'text-oracle-red', border: 'border-oracle-red/30', label: 'NEGATIVE' },
+};
+
+const TIMING_COLORS = {
+    'early': { text: 'text-oracle-red', label: 'EARLY GAME' },
+    'mid':   { text: 'text-oracle-gold', label: 'MID GAME' },
+    'late':  { text: 'text-oracle-blue', label: 'LATE GAME' },
+    'all':   { text: 'text-oracle-text', label: 'ALL GAME' },
+};
+
+const WC_TYPE_STYLES = {
+    'target':  { bg: 'bg-oracle-green/10', border: 'border-oracle-green/30', icon: '&#9654;', color: 'text-oracle-green' },
+    'threat':  { bg: 'bg-oracle-red/10', border: 'border-oracle-red/30', icon: '&#9888;', color: 'text-oracle-red' },
+    'carry':   { bg: 'bg-oracle-blue/10', border: 'border-oracle-blue/30', icon: '&#9733;', color: 'text-oracle-blue' },
+    'timing':  { bg: 'bg-oracle-gold/10', border: 'border-oracle-gold/30', icon: '&#9200;', color: 'text-oracle-gold' },
 };
 
 let lastTipVersion = -1;
 let dashboardRendered = false;
-let bootsLoaded = false;
+let lastScoutingStatus = '';
 let lastDragonType = null;
 
 function renderDashboard(state) {
-    if (dashboardRendered) return;
+    if (dashboardRendered && lastScoutingStatus === state.scouting_status) return;
 
     const dd = state.ddragon;
     if (dd) DDRAGON = dd;
@@ -191,8 +206,6 @@ function renderDashboard(state) {
     if (state.runes) {
         const runes = state.runes;
         let html = '';
-
-        // Keystone (prominent)
         html += `<div class="flex items-center gap-2 mb-1">
             <div class="w-10 h-10 rounded-full bg-oracle-gold/20 border-2 border-oracle-gold/50 flex items-center justify-center">
                 <span class="text-oracle-gold text-lg font-bold">${runes.keystone.name.charAt(0)}</span>
@@ -202,8 +215,6 @@ function renderDashboard(state) {
                 <div class="text-oracle-text/50 text-[10px]">${runes.primary_tree} + ${runes.secondary_tree}</div>
             </div>
         </div>`;
-
-        // Other runes as compact badges
         if (runes.all_runes && runes.all_runes.length > 0) {
             html += '<div class="flex flex-wrap gap-1 mt-1">';
             runes.all_runes.forEach(r => {
@@ -212,10 +223,7 @@ function renderDashboard(state) {
             html += '</div>';
         }
         document.getElementById('runes-content').innerHTML = html;
-
-        // Rune tags
-        const tagsDiv = document.getElementById('rune-tags');
-        tagsDiv.innerHTML = `
+        document.getElementById('rune-tags').innerHTML = `
             <span class="bg-oracle-purple/20 text-oracle-purple text-[10px] px-1.5 py-0.5 rounded-full border border-oracle-purple/30">${runes.primary_tree}</span>
             <span class="bg-oracle-blue/20 text-oracle-blue text-[10px] px-1.5 py-0.5 rounded-full border border-oracle-blue/30">${runes.secondary_tree}</span>
         `;
@@ -223,8 +231,7 @@ function renderDashboard(state) {
 
     // SPELLS section
     if (state.summoner_spells && state.summoner_spells.length > 0) {
-        const spellsDiv = document.getElementById('spells-content');
-        spellsDiv.innerHTML = state.summoner_spells.map(s =>
+        document.getElementById('spells-content').innerHTML = state.summoner_spells.map(s =>
             `<div class="text-center">
                 <img src="${spellIcon(s)}" class="w-12 h-12 rounded-lg border border-oracle-border" alt="${s}" onerror="this.style.display='none'">
                 <div class="text-oracle-text/50 text-[10px] mt-1">${s}</div>
@@ -233,49 +240,88 @@ function renderDashboard(state) {
     }
 
     // SKILL ORDER section
-    if (state.build_rec && state.build_rec.skill_order) {
-        const order = state.build_rec.skill_order;
-        const maxOrder = state.build_rec.skill_max_order;
+    if (state.build_rec) {
         let html = '';
-        if (maxOrder) {
-            html += `<div class="text-oracle-light font-bold text-lg mb-1">${maxOrder}</div>`;
+        if (state.build_rec.skill_max_order) {
+            html += `<div class="text-oracle-light font-bold text-lg mb-1">${state.build_rec.skill_max_order}</div>`;
         }
-        if (order && order.length > 0) {
-            html += '<div class="text-oracle-text/60 text-xs">Level 1: ' + order[0] + '</div>';
+        if (state.build_rec.skill_order && state.build_rec.skill_order.length > 0) {
+            html += '<div class="text-oracle-text/60 text-xs">Level 1: ' + state.build_rec.skill_order[0] + '</div>';
         }
-        if (html) {
-            document.getElementById('skill-content').innerHTML = html;
-        }
+        if (html) document.getElementById('skill-content').innerHTML = html;
     }
 
-    // WIN CONDITION section
+    // SCOUTING STATUS badge
+    const badge = document.getElementById('scouting-badge');
+    if (state.scouting_status === 'scouting') {
+        badge.textContent = 'Scouting...';
+        badge.className = 'text-[10px] px-1.5 py-0.5 rounded-full bg-oracle-gold/20 text-oracle-gold border border-oracle-gold/30 animate-pulse';
+        badge.classList.remove('hidden');
+    } else if (state.scouting_status === 'done') {
+        badge.textContent = 'Scouted';
+        badge.className = 'text-[10px] px-1.5 py-0.5 rounded-full bg-oracle-green/20 text-oracle-green border border-oracle-green/30';
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
+    }
+
+    // WIN CONDITION section (data-driven with scouting)
     if (state.win_condition && state.win_condition.length > 0) {
         const wcDiv = document.getElementById('win-condition');
-        wcDiv.innerHTML = state.win_condition.map(wc =>
-            `<div class="flex items-center gap-3">
-                <img src="${champIcon(wc.icon)}" class="w-10 h-10 rounded-lg border border-oracle-border" alt="${wc.champion}" onerror="this.style.display='none'">
-                <div>
-                    <div class="text-oracle-light font-bold">${wc.champion}</div>
-                    <div class="text-oracle-text/50 text-xs">${wc.role}</div>
+        wcDiv.innerHTML = state.win_condition.map(wc => {
+            const style = WC_TYPE_STYLES[wc.type] || WC_TYPE_STYLES['carry'];
+            const timing = TIMING_COLORS[wc.timing] || TIMING_COLORS['mid'];
+            const hasIcon = wc.champion && wc.icon;
+            return `<div class="${style.bg} border ${style.border} rounded-lg p-2 fade-in">
+                <div class="flex items-center gap-2">
+                    ${hasIcon ? `<img src="${champIcon(wc.icon)}" class="w-8 h-8 rounded border border-oracle-border" alt="" onerror="this.style.display='none'">` : `<span class="${style.color} text-lg">${style.icon}</span>`}
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-1.5">
+                            <span class="${style.color} text-xs font-bold">${wc.reason}</span>
+                        </div>
+                        ${wc.detail ? `<div class="text-oracle-text/60 text-[10px] mt-0.5 leading-tight">${wc.detail}</div>` : ''}
+                    </div>
                 </div>
-            </div>`
-        ).join('');
+                ${wc.timing ? `<div class="${timing.text} text-[9px] font-bold mt-1 uppercase">${timing.label}</div>` : ''}
+            </div>`;
+        }).join('');
     }
 
-    // LANE MATCHUPS section
+    // LANE MATCHUPS section (with enemy stats from scouting)
     if (state.lane_matchups && state.lane_matchups.length > 0) {
         const lmDiv = document.getElementById('lane-matchups');
         lmDiv.innerHTML = state.lane_matchups.map(lm => {
             const style = RATING_STYLES[lm.rating] || RATING_STYLES['EVEN'];
-            return `<div class="flex items-center justify-between py-1.5 px-2 rounded ${style.bg}/5">
-                <div class="flex items-center gap-2 w-32">
-                    <img src="${champIcon(lm.ally_icon)}" class="w-7 h-7 rounded border border-oracle-border" alt="${lm.ally_champ}" onerror="this.style.display='none'">
-                    <span class="text-oracle-light text-sm">${lm.ally_champ}</span>
+            const es = lm.enemy_stats || {};
+
+            // Build enemy stat badges
+            let badges = '';
+            if (es.first_timing) badges += '<span class="bg-oracle-purple/20 text-oracle-purple text-[9px] px-1 py-0.5 rounded-full">1ST TIME</span>';
+            if (es.tilted) badges += '<span class="bg-oracle-red/20 text-oracle-red text-[9px] px-1 py-0.5 rounded-full">TILTED</span>';
+            if (es.one_trick) badges += '<span class="bg-oracle-gold/20 text-oracle-gold text-[9px] px-1 py-0.5 rounded-full">OTP</span>';
+            if (es.hot_streak) badges += '<span class="bg-oracle-green/20 text-oracle-green text-[9px] px-1 py-0.5 rounded-full">HOT</span>';
+
+            // Enemy stats line
+            let statsLine = '';
+            if (es.rank) statsLine += `<span class="text-oracle-text/40">${es.rank.split(' ').slice(0,2).join(' ')}</span>`;
+            if (es.champ_wr != null && es.champ_games) statsLine += `<span class="${es.champ_wr >= 55 ? 'text-oracle-green' : es.champ_wr <= 45 ? 'text-oracle-red' : 'text-oracle-gold'}">${es.champ_wr}%</span><span class="text-oracle-text/30">(${es.champ_games}g)</span>`;
+            else if (es.win_rate != null) statsLine += `<span class="${es.win_rate >= 55 ? 'text-oracle-green' : es.win_rate <= 45 ? 'text-oracle-red' : 'text-oracle-gold'}">${es.win_rate}% WR</span>`;
+
+            return `<div class="flex items-center justify-between py-1.5 px-2 rounded hover:bg-oracle-border/10 transition-colors">
+                <div class="flex items-center gap-2 w-28">
+                    <img src="${champIcon(lm.ally_icon)}" class="w-7 h-7 rounded border border-oracle-border" alt="" onerror="this.style.display='none'">
+                    <span class="text-oracle-light text-sm truncate">${lm.ally_champ}</span>
                 </div>
-                <span class="${style.bg} ${style.text} border ${style.border} text-[10px] px-2 py-0.5 rounded-full font-bold">${style.label}</span>
-                <div class="flex items-center gap-2 w-32 justify-end">
-                    <span class="text-oracle-light text-sm">${lm.enemy_champ}</span>
-                    <img src="${champIcon(lm.enemy_icon)}" class="w-7 h-7 rounded border border-oracle-border" alt="${lm.enemy_champ}" onerror="this.style.display='none'">
+                <div class="flex flex-col items-center gap-0.5">
+                    <span class="${style.bg} ${style.text} border ${style.border} text-[10px] px-2 py-0.5 rounded-full font-bold">${style.label}</span>
+                    <div class="flex gap-0.5">${badges}</div>
+                </div>
+                <div class="flex items-center gap-2 w-28 justify-end">
+                    <div class="text-right">
+                        <span class="text-oracle-light text-sm">${lm.enemy_champ}</span>
+                        ${statsLine ? `<div class="flex items-center gap-1 justify-end text-[9px]">${statsLine}</div>` : ''}
+                    </div>
+                    <img src="${champIcon(lm.enemy_icon)}" class="w-7 h-7 rounded border border-oracle-border" alt="" onerror="this.style.display='none'">
                 </div>
             </div>`;
         }).join('');
@@ -285,22 +331,18 @@ function renderDashboard(state) {
     if (state.build_rec && state.build_rec.build_path) {
         const buildDiv = document.getElementById('build-items');
         let html = '';
-        state.build_rec.build_path.forEach((item, i) => {
+        state.build_rec.build_path.forEach(item => {
             html += `<div class="flex items-center gap-2">
                 <img src="${itemIcon(item.id)}" class="w-8 h-8 rounded border border-oracle-border/50" alt="${item.name}" onerror="this.style.display='none'">
                 <span class="text-oracle-light text-sm">${item.name}</span>
             </div>`;
         });
-
-        // Boots
         if (state.build_rec.boots) {
             html += `<div class="flex items-center gap-2 mt-1 pt-1 border-t border-oracle-border/30">
-                <img src="${itemIcon(state.build_rec.boots.id)}" class="w-8 h-8 rounded border border-oracle-border/50" alt="${state.build_rec.boots.name}" onerror="this.style.display='none'">
+                <img src="${itemIcon(state.build_rec.boots.id)}" class="w-8 h-8 rounded border border-oracle-border/50" alt="" onerror="this.style.display='none'">
                 <span class="text-oracle-light text-sm">${state.build_rec.boots.name}</span>
             </div>`;
         }
-
-        // Win rate info
         if (state.build_rec.win_rate) {
             const wr = state.build_rec.win_rate;
             const wrColor = wr >= 55 ? 'text-oracle-green' : wr >= 50 ? 'text-oracle-gold' : 'text-oracle-red';
@@ -308,7 +350,6 @@ function renderDashboard(state) {
                 <span class="${wrColor} font-bold">${wr}%</span> WR · ${state.build_rec.sample_size} games
             </div>`;
         }
-
         buildDiv.innerHTML = html;
     } else if (state.build_rec && state.build_rec.message) {
         document.getElementById('build-items').innerHTML =
@@ -321,15 +362,12 @@ function renderDashboard(state) {
     }
 
     dashboardRendered = true;
+    lastScoutingStatus = state.scouting_status || '';
 }
 
 function updateLiveData(state) {
     const dd = state.ddragon;
     if (dd) DDRAGON = dd;
-
-    // Update game timer in nav area
-    const timer = document.getElementById('game-timer');
-    if (timer) timer.textContent = formatTime(state.game_time);
 
     // DRAGON / OBJECTIVE section
     const nextDragon = state.next_dragon || 'Unknown';
@@ -354,17 +392,19 @@ function updateLiveData(state) {
                 </div>
             </div>
         `;
-
-        // Auto-evaluate dragon
         if (nextDragon !== lastDragonType && state.lane_matchups && state.lane_matchups.length > 0) {
             lastDragonType = nextDragon;
             evalDragon(nextDragon, state);
         }
-    } else if (terrain !== 'Default') {
-        if (terrain !== lastDragonType) {
-            lastDragonType = terrain;
-            evalDragon(terrain, state);
-        }
+    } else if (terrain !== 'Default' && terrain !== lastDragonType) {
+        lastDragonType = terrain;
+        evalDragon(terrain, state);
+    }
+
+    // Re-render dashboard if scouting status changed (new data arrived)
+    if (state.scouting_status !== lastScoutingStatus) {
+        dashboardRendered = false;
+        renderDashboard(state);
     }
 
     // TIPS section
@@ -410,7 +450,6 @@ function updateLiveData(state) {
 
 async function evalDragon(type, state) {
     if (!state.lane_matchups || state.lane_matchups.length === 0) return;
-
     const allyNames = state.lane_matchups.map(m => m.ally_champ).join(',');
     const enemyNames = state.lane_matchups.map(m => m.enemy_champ).join(',');
     if (!allyNames || !enemyNames) return;
@@ -440,23 +479,19 @@ async function evalDragon(type, state) {
                 <span class="bg-${color}/20 text-${color} text-[10px] px-2 py-0.5 rounded-full border border-${color}/30">${d.contest}</span>
             </div>
         `;
-    } catch(e) {
-        // Keep existing content
-    }
+    } catch(e) {}
 }
 
 function showPostGame(state) {
     document.getElementById('game-active').style.display = 'none';
     document.getElementById('waiting-state').style.display = 'none';
     document.getElementById('post-game-state').style.display = 'block';
-
     const result = state.post_game_result;
     if (result) {
         const winText = result.win ? 'VICTORY' : 'DEFEAT';
         const winColor = result.win ? 'text-oracle-green' : 'text-oracle-red';
         document.getElementById('pg-result').className = `text-2xl font-bold ${winColor}`;
         document.getElementById('pg-result').textContent = winText;
-
         document.getElementById('pg-summary').innerHTML = `
             <div class="text-center">
                 <div class="text-oracle-light font-bold text-lg">${result.champion || ''}</div>
@@ -476,16 +511,14 @@ function updateUI(state) {
         document.getElementById('game-active').style.display = 'block';
         document.getElementById('waiting-state').style.display = 'none';
         document.getElementById('post-game-state').style.display = 'none';
-
         renderDashboard(state);
         updateLiveData(state);
-
     } else if (state.phase === 'post_game') {
         showPostGame(state);
         dashboardRendered = false;
         lastTipVersion = -1;
         lastDragonType = null;
-
+        lastScoutingStatus = '';
     } else {
         document.getElementById('game-active').style.display = 'none';
         document.getElementById('post-game-state').style.display = 'none';
@@ -493,6 +526,7 @@ function updateUI(state) {
         dashboardRendered = false;
         lastTipVersion = -1;
         lastDragonType = null;
+        lastScoutingStatus = '';
     }
 }
 

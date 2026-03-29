@@ -503,6 +503,7 @@ async def get_game_state():
         "runes": game_state.get("runes"),
         "summoner_spells": game_state.get("summoner_spells", []),
         "win_condition": game_state.get("win_condition", []),
+        "scouting_status": game_state.get("scouting_status", "idle"),
     }
 
 

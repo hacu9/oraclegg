@@ -1,11 +1,12 @@
 """Background game state monitor.
 
 Polls for active games and updates game state for the UI.
-On first game detection, fetches build recommendations, classifies enemy comp,
-generates lane matchup assessments and strategic advice.
+On first game detection, auto-scouts all enemies, fetches build recommendations,
+classifies enemy comp, generates data-driven lane matchups and strategic advice.
 """
 
 import asyncio
+import json
 import logging
 from datetime import datetime
 
@@ -21,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 _tip_counter = 0
 _game_initialized = False
+_scouting_task: asyncio.Task | None = None
 
 # Map Live Client position names to standard role names
 POSITION_MAP = {
@@ -64,22 +66,14 @@ STRATEGY_TIPS = {
     "balanced": "The enemy team is well-balanced. Play to your champion's strengths and look for picks before objectives spawn.",
 }
 
-# Simple matchup heuristics based on champion class
-_CLASS_ADVANTAGE = {
-    ("Assassin", "Mage"): "POSITIVE",
-    ("Assassin", "Marksman"): "POSITIVE",
-    ("Tank", "Assassin"): "POSITIVE",
-    ("Fighter", "Marksman"): "POSITIVE",
-    ("Fighter", "Mage"): "POSITIVE",
-    ("Mage", "Tank"): "POSITIVE",
-    ("Marksman", "Tank"): "POSITIVE",
-    ("Support", "Assassin"): "NEGATIVE",
-    ("Mage", "Assassin"): "NEGATIVE",
-    ("Marksman", "Assassin"): "NEGATIVE",
-    ("Marksman", "Fighter"): "NEGATIVE",
-    ("Mage", "Fighter"): "NEGATIVE",
-    ("Tank", "Mage"): "NEGATIVE",
-    ("Tank", "Marksman"): "NEGATIVE",
+# Champion class scaling profiles
+_SCALING_PROFILE = {
+    "Marksman": "late",
+    "Mage": "mid",
+    "Assassin": "early",
+    "Fighter": "mid",
+    "Tank": "mid",
+    "Support": "mid",
 }
 
 # Shared state accessible from API routes
@@ -103,6 +97,9 @@ game_state = {
     "runes": None,
     "summoner_spells": [],
     "win_condition": [],
+    # Scouting intelligence (populated async after game start)
+    "enemy_scouting": {},  # champ_name -> scouting report
+    "scouting_status": "idle",  # idle, scouting, done, error
 }
 
 
@@ -122,7 +119,6 @@ async def _resolve_champions(names: list[str]) -> dict[str, dict]:
 def _get_primary_class(tags_json: str) -> str:
     """Extract primary class from champion tags JSON."""
     try:
-        import json
         tags = json.loads(tags_json)
         if tags:
             return tags[0]
@@ -131,27 +127,81 @@ def _get_primary_class(tags_json: str) -> str:
     return "Fighter"
 
 
-def _rate_matchup(ally_tags: str, enemy_tags: str) -> str:
-    """Rate a lane matchup based on champion class interactions."""
+def _rate_matchup_from_scouting(enemy_report: dict | None) -> str:
+    """Rate a matchup based on scouting data (enemy player stats)."""
+    if not enemy_report:
+        return "EVEN"
+
+    tendencies = enemy_report.get("tendencies", {})
+
+    # First-timing = strong advantage for us
+    if tendencies.get("first_timing"):
+        return "POSITIVE"
+
+    # Tilted player = advantage
+    if tendencies.get("tilted"):
+        return "POSITIVE"
+
+    # Check their current champ stats
+    champ_stats = tendencies.get("current_champ_stats")
+    if champ_stats:
+        wr = champ_stats.get("win_rate", 50)
+        games = champ_stats.get("games", 0)
+        if games >= 5 and wr >= 60:
+            return "NEGATIVE"  # They're good on this champ
+        if games >= 5 and wr <= 40:
+            return "POSITIVE"  # They struggle on this champ
+
+    # Check recent overall win rate
+    recent = tendencies.get("recent_winrate", {})
+    pct = recent.get("pct", 50)
+    if pct >= 70:
+        return "NEGATIVE"
+    if pct <= 30:
+        return "POSITIVE"
+
+    # OTP on their champ = danger
+    if tendencies.get("one_trick"):
+        return "NEGATIVE"
+
+    return "EVEN"
+
+
+def _rate_matchup_class(ally_tags: str, enemy_tags: str) -> str:
+    """Fallback: rate matchup by champion class."""
     ally_class = _get_primary_class(ally_tags)
     enemy_class = _get_primary_class(enemy_tags)
+
+    _CLASS_ADVANTAGE = {
+        ("Assassin", "Mage"): "POSITIVE",
+        ("Assassin", "Marksman"): "POSITIVE",
+        ("Tank", "Assassin"): "POSITIVE",
+        ("Fighter", "Marksman"): "POSITIVE",
+        ("Fighter", "Mage"): "POSITIVE",
+        ("Mage", "Tank"): "POSITIVE",
+        ("Marksman", "Tank"): "POSITIVE",
+    }
 
     rating = _CLASS_ADVANTAGE.get((ally_class, enemy_class))
     if rating:
         return rating
 
-    # Check reverse
     reverse = _CLASS_ADVANTAGE.get((enemy_class, ally_class))
     if reverse == "POSITIVE":
         return "NEGATIVE"
-    if reverse == "NEGATIVE":
-        return "POSITIVE"
-
     return "EVEN"
 
 
-def _pair_lanes(allies: list[dict], enemies: list[dict], champ_data: dict) -> list[dict]:
-    """Pair ally and enemy champions by lane position."""
+def _pair_lanes(
+    allies: list[dict],
+    enemies: list[dict],
+    champ_data: dict,
+    enemy_scouting: dict | None = None,
+) -> list[dict]:
+    """Pair ally and enemy champions by lane position.
+
+    Uses scouting data when available, falls back to class heuristics.
+    """
     ally_by_pos = {}
     enemy_by_pos = {}
 
@@ -175,10 +225,39 @@ def _pair_lanes(allies: list[dict], enemies: list[dict], champ_data: dict) -> li
             ally_info = champ_data.get(ally_name, {})
             enemy_info = champ_data.get(enemy_name, {})
 
-            rating = _rate_matchup(
-                ally_info.get("tags", "[]"),
-                enemy_info.get("tags", "[]"),
-            )
+            # Try scouting-based rating first, fall back to class heuristic
+            enemy_report = (enemy_scouting or {}).get(enemy_name)
+            if enemy_report:
+                rating = _rate_matchup_from_scouting(enemy_report)
+            else:
+                rating = _rate_matchup_class(
+                    ally_info.get("tags", "[]"),
+                    enemy_info.get("tags", "[]"),
+                )
+
+            # Extract enemy stats for display
+            enemy_stats = {}
+            if enemy_report:
+                t = enemy_report.get("tendencies", {})
+                enemy_stats = {
+                    "rank": enemy_report.get("rank"),
+                    "win_rate": t.get("recent_winrate", {}).get("pct"),
+                    "games": t.get("recent_winrate", {}).get("wins", 0) + t.get("recent_winrate", {}).get("losses", 0),
+                    "kda": t.get("kda", {}).get("kda"),
+                    "first_timing": t.get("first_timing", False),
+                    "tilted": bool(t.get("tilted")),
+                    "one_trick": bool(t.get("one_trick")),
+                    "hot_streak": t.get("hot_streak", False),
+                    "cold_streak": t.get("cold_streak", False),
+                    "champ_wr": t.get("current_champ_stats", {}).get("win_rate"),
+                    "champ_games": t.get("current_champ_stats", {}).get("games"),
+                    "mastery_level": None,
+                    "mastery_points": None,
+                }
+                mastery = enemy_report.get("current_champion_mastery")
+                if mastery:
+                    enemy_stats["mastery_level"] = mastery.get("level")
+                    enemy_stats["mastery_points"] = mastery.get("points")
 
             matchups.append({
                 "role": POSITION_MAP.get(pos, pos),
@@ -187,30 +266,150 @@ def _pair_lanes(allies: list[dict], enemies: list[dict], champ_data: dict) -> li
                 "enemy_champ": enemy_name,
                 "enemy_icon": CHAMP_ICON_MAP.get(enemy_name, enemy_name),
                 "rating": rating,
+                "enemy_stats": enemy_stats,
             })
 
     return matchups
 
 
-def _identify_win_conditions(allies: list[dict], champ_data: dict) -> list[dict]:
-    """Identify key carry champions on your team."""
-    carries = []
+def _identify_win_conditions(
+    allies: list[dict],
+    enemies: list[dict],
+    champ_data: dict,
+    enemy_scouting: dict | None = None,
+    archetypes: list[str] | None = None,
+) -> list[dict]:
+    """Identify win conditions based on scouting data and team comp.
+
+    Returns prioritized list of win condition entries with timing.
+    """
+    conditions = []
+
+    # 1. Find weak enemy lanes (from scouting)
+    if enemy_scouting:
+        for p in enemies:
+            champ = p.get("championName", "")
+            report = enemy_scouting.get(champ)
+            if not report:
+                continue
+            t = report.get("tendencies", {})
+            pos = POSITION_MAP.get(p.get("position", ""), "")
+
+            if t.get("first_timing"):
+                conditions.append({
+                    "champion": champ,
+                    "icon": CHAMP_ICON_MAP.get(champ, champ),
+                    "type": "target",
+                    "reason": f"First-timing {champ}",
+                    "detail": f"No recent games on this champion — punish in lane",
+                    "timing": "early",
+                    "priority": 1,
+                })
+            elif t.get("tilted"):
+                streak = t["tilted"].get("loss_streak", 3)
+                conditions.append({
+                    "champion": champ,
+                    "icon": CHAMP_ICON_MAP.get(champ, champ),
+                    "type": "target",
+                    "reason": f"Tilted ({streak}L streak)",
+                    "detail": f"On a {streak}-game losing streak — likely to make mistakes",
+                    "timing": "early",
+                    "priority": 2,
+                })
+            elif t.get("cold_streak"):
+                conditions.append({
+                    "champion": champ,
+                    "icon": CHAMP_ICON_MAP.get(champ, champ),
+                    "type": "target",
+                    "reason": "Cold streak",
+                    "detail": "Struggling recently — apply pressure",
+                    "timing": "early",
+                    "priority": 3,
+                })
+
+            # Identify threats
+            champ_stats = t.get("current_champ_stats", {})
+            if t.get("one_trick"):
+                otp = t["one_trick"]
+                conditions.append({
+                    "champion": champ,
+                    "icon": CHAMP_ICON_MAP.get(champ, champ),
+                    "type": "threat",
+                    "reason": f"OTP ({otp.get('pct', 0)}% play rate)",
+                    "detail": f"One-trick with {otp.get('games', 0)} games — respect their knowledge",
+                    "timing": "all",
+                    "priority": 4,
+                })
+            elif champ_stats.get("games", 0) >= 10 and champ_stats.get("win_rate", 50) >= 60:
+                conditions.append({
+                    "champion": champ,
+                    "icon": CHAMP_ICON_MAP.get(champ, champ),
+                    "type": "threat",
+                    "reason": f"{champ_stats['win_rate']}% WR ({champ_stats['games']}g)",
+                    "detail": f"Strong on this pick — don't give them early kills",
+                    "timing": "early",
+                    "priority": 5,
+                })
+
+    # 2. Identify ally carries by role and scaling
     for p in allies:
         name = p.get("championName", "")
         info = champ_data.get(name, {})
-        tags_str = info.get("tags", "[]")
-        primary = _get_primary_class(tags_str)
+        primary = _get_primary_class(info.get("tags", "[]"))
         pos = POSITION_MAP.get(p.get("position", ""), "")
+        scaling = _SCALING_PROFILE.get(primary, "mid")
 
-        # Identify carries by role and class
-        if pos in ("ADC", "MID") or primary in ("Marksman", "Mage", "Assassin"):
-            carries.append({
+        if primary in ("Marksman",):
+            conditions.append({
                 "champion": name,
                 "icon": CHAMP_ICON_MAP.get(name, name),
-                "role": pos or primary,
+                "type": "carry",
+                "reason": f"Primary carry ({pos})",
+                "detail": "Protect and enable in teamfights",
+                "timing": scaling,
+                "priority": 6,
+            })
+        elif pos == "MID" and primary in ("Mage", "Assassin"):
+            conditions.append({
+                "champion": name,
+                "icon": CHAMP_ICON_MAP.get(name, name),
+                "type": "carry",
+                "reason": f"Mid lane carry",
+                "detail": "Roam support or follow-up on their plays",
+                "timing": scaling,
+                "priority": 7,
             })
 
-    return carries[:2]  # Top 2 win conditions
+    # 3. Comp timing advice
+    comp_timing = "mid"
+    if archetypes:
+        for arch in archetypes:
+            if arch in ("scaling",):
+                comp_timing = "early"  # We need to end early vs scaling
+                break
+            if arch in ("early_game", "assassin"):
+                comp_timing = "late"  # We outscale them
+                break
+
+    if comp_timing != "mid":
+        timing_label = {
+            "early": "Win early — enemy outscales",
+            "late": "Survive early — you outscale",
+        }.get(comp_timing, "")
+        if timing_label:
+            conditions.append({
+                "champion": "",
+                "icon": "",
+                "type": "timing",
+                "reason": timing_label,
+                "detail": "",
+                "timing": comp_timing,
+                "priority": 0,
+            })
+
+    # Sort by priority (lower = more important)
+    conditions.sort(key=lambda x: x["priority"])
+    return conditions[:6]
 
 
 def _parse_runes(runes_data: dict) -> dict | None:
@@ -249,13 +448,86 @@ def _parse_spells(player_data: dict) -> list[str]:
     return result
 
 
+async def _scout_enemies_background(enemies: list[dict], champ_data: dict):
+    """Scout all enemy players in the background.
+
+    Runs as a separate task so it doesn't block the game monitor.
+    Updates game_state progressively as each enemy is scouted.
+    """
+    from oraclegg.riot.client import RiotClient
+    from oraclegg.scouting.scout import scout_player
+
+    game_state["scouting_status"] = "scouting"
+    client = RiotClient()
+    scouting_results = {}
+
+    try:
+        for p in enemies:
+            name = p.get("riotIdGameName", p.get("summonerName", ""))
+            tag = p.get("riotIdTagLine", "")
+            champ = p.get("championName", "")
+            champ_id = champ_data.get(champ, {}).get("id")
+
+            if not name:
+                continue
+
+            try:
+                # Try to get account by Riot ID
+                if tag:
+                    account = await client.get_account_by_riot_id(name, tag)
+                    puuid = account.puuid
+                else:
+                    # No tag available, skip scouting for this player
+                    continue
+
+                report = await scout_player(
+                    client, puuid,
+                    game_name=name,
+                    tag_line=tag,
+                    current_champion_id=champ_id,
+                )
+                scouting_results[champ] = report
+                # Update state progressively so UI shows data as it arrives
+                game_state["enemy_scouting"] = dict(scouting_results)
+                logger.info(f"Scouted {name}#{tag} ({champ}): {report.get('rank', 'Unranked')}")
+
+            except Exception as e:
+                logger.warning(f"Failed to scout {name}#{tag}: {e}")
+
+        # All scouting done — recalculate lane matchups and win conditions with real data
+        game_state["enemy_scouting"] = scouting_results
+        game_state["scouting_status"] = "done"
+
+        # Rebuild lane matchups with scouting data
+        allies_raw = game_state.get("_allies_raw", [])
+        enemies_raw = game_state.get("_enemies_raw", [])
+        archetypes = game_state.get("enemy_archetypes", [])
+
+        if allies_raw and enemies_raw:
+            game_state["lane_matchups"] = _pair_lanes(
+                allies_raw, enemies_raw, champ_data, scouting_results
+            )
+            game_state["win_condition"] = _identify_win_conditions(
+                allies_raw, enemies_raw, champ_data, scouting_results, archetypes
+            )
+
+        logger.info(f"Enemy scouting complete: {len(scouting_results)}/{len(enemies)} players")
+
+    except Exception as e:
+        logger.error(f"Enemy scouting failed: {e}")
+        game_state["scouting_status"] = "error"
+    finally:
+        await client.close()
+
+
 async def _initialize_game(data: dict):
     """Run once when a game is first detected.
 
-    Fetches build recommendation, classifies enemy comp, generates
-    lane matchups, strategy, and win conditions.
+    Fetches build recommendation, classifies enemy comp, generates initial
+    lane matchups (class-based), then kicks off background scouting for
+    data-driven matchup ratings and win conditions.
     """
-    global _game_initialized
+    global _game_initialized, _scouting_task
 
     all_players = data.get("allPlayers", [])
     active = data.get("activePlayer", {})
@@ -280,6 +552,10 @@ async def _initialize_game(data: dict):
 
     allies = [p for p in all_players if p.get("team") == your_team]
     enemies = [p for p in all_players if p.get("team") != your_team]
+
+    # Store raw player lists for scouting callback
+    game_state["_allies_raw"] = allies
+    game_state["_enemies_raw"] = enemies
 
     # Resolve all champion names to IDs/keys/tags
     all_names = [p.get("championName", "") for p in all_players if p.get("championName")]
@@ -323,11 +599,11 @@ async def _initialize_game(data: dict):
     if not strategy:
         strategy = STRATEGY_TIPS.get("balanced", "")
 
-    # Pair lane matchups
+    # Initial lane matchups (class-based, updated with scouting later)
     lane_matchups = _pair_lanes(allies, enemies, champ_data)
 
-    # Identify win conditions
-    win_condition = _identify_win_conditions(allies, champ_data)
+    # Initial win conditions (will be enriched by scouting)
+    win_condition = _identify_win_conditions(allies, enemies, champ_data, None, archetypes)
 
     # Parse runes from active player
     runes = _parse_runes(active.get("fullRunes", {}))
@@ -348,16 +624,22 @@ async def _initialize_game(data: dict):
     game_state["summoner_spells"] = summoner_spells
 
     _game_initialized = True
-    logger.info(
-        f"Game initialized: {your_champ} {your_position} vs {archetypes[:3]}"
+    logger.info(f"Game initialized: {your_champ} {your_position} vs {archetypes[:3]}")
+
+    # Kick off background scouting (doesn't block the monitor loop)
+    _scouting_task = asyncio.create_task(
+        _scout_enemies_background(enemies, champ_data)
     )
 
 
 def _reset_game_state():
     """Reset enhanced game state for next game."""
-    global _game_initialized, _tip_counter
+    global _game_initialized, _tip_counter, _scouting_task
     _game_initialized = False
     _tip_counter = 0
+    if _scouting_task and not _scouting_task.done():
+        _scouting_task.cancel()
+    _scouting_task = None
     tip_engine._seen_items.clear()
     tip_engine._game_tips_given.clear()
     game_state["all_tips"] = []
@@ -373,6 +655,10 @@ def _reset_game_state():
     game_state["runes"] = None
     game_state["summoner_spells"] = []
     game_state["post_game_result"] = None
+    game_state["enemy_scouting"] = {}
+    game_state["scouting_status"] = "idle"
+    game_state["_allies_raw"] = []
+    game_state["_enemies_raw"] = []
 
 
 async def game_monitor_loop():
@@ -422,7 +708,7 @@ async def game_monitor_loop():
                 else:
                     game_state["next_dragon"] = "Unknown"
 
-                # One-time game initialization (fetch build, comp, matchups)
+                # One-time game initialization (fetch build, comp, matchups + start scouting)
                 if not _game_initialized:
                     try:
                         await _initialize_game(data)

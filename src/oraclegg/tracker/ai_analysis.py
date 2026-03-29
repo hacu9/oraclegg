@@ -4,6 +4,7 @@ Generates detailed match analysis using Claude API or falls back to rule-based a
 Each match gets a persistent analysis stored in the DB.
 """
 
+import asyncio
 import json
 import logging
 from datetime import datetime
@@ -16,18 +17,22 @@ from oraclegg.db.models import PersonalMatch, Champion, Item
 logger = logging.getLogger(__name__)
 
 
-async def _get_champion_name(cid: int) -> str:
+async def _get_champion_names(cids: list[int]) -> dict[int, str]:
+    """Batch-fetch champion names by ID."""
+    if not cids:
+        return {}
     async with async_session() as session:
-        r = await session.execute(select(Champion).where(Champion.id == cid))
-        c = r.scalar_one_or_none()
-        return c.name if c else f"Champion {cid}"
+        r = await session.execute(select(Champion).where(Champion.id.in_(cids)))
+        return {c.id: c.name for c in r.scalars().all()}
 
 
-async def _get_item_name(iid: int) -> str:
+async def _get_item_names(iids: list[int]) -> dict[int, str]:
+    """Batch-fetch item names by ID."""
+    if not iids:
+        return {}
     async with async_session() as session:
-        r = await session.execute(select(Item).where(Item.id == iid))
-        i = r.scalar_one_or_none()
-        return i.name if i else f"Item {iid}"
+        r = await session.execute(select(Item).where(Item.id.in_(iids)))
+        return {i.id: i.name for i in r.scalars().all()}
 
 
 def _kda_rating(kills, deaths, assists):
@@ -132,23 +137,24 @@ async def generate_analysis(match_id: str) -> dict | None:
         if not match:
             return None
 
-    champ_name = await _get_champion_name(match.champion_id)
     game_mins = match.game_duration / 60
     kda_ratio = (match.kills + match.assists) / max(match.deaths, 1)
 
-    # Resolve items
+    # Resolve items and champions in batch (avoid N+1)
     item_ids = json.loads(match.items_final) if match.items_final else []
-    items = []
-    for iid in item_ids:
-        if iid > 0:
-            items.append(await _get_item_name(iid))
-
-    # Resolve enemy champions
     enemy_ids = json.loads(match.enemy_champion_ids) if match.enemy_champion_ids else []
-    enemies = []
-    for eid in enemy_ids:
-        if eid > 0:
-            enemies.append(await _get_champion_name(eid))
+
+    all_champ_ids = [match.champion_id] + [eid for eid in enemy_ids if eid > 0]
+    all_item_ids = [iid for iid in item_ids if iid > 0]
+
+    champ_names, item_names = await asyncio.gather(
+        _get_champion_names(all_champ_ids),
+        _get_item_names(all_item_ids),
+    )
+
+    champ_name = champ_names.get(match.champion_id, f"Champion {match.champion_id}")
+    items = [item_names.get(iid, f"Item {iid}") for iid in item_ids if iid > 0]
+    enemies = [champ_names.get(eid, f"Champion {eid}") for eid in enemy_ids if eid > 0]
 
     # Build analysis sections
     sections = []

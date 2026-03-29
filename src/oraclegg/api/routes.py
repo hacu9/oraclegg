@@ -438,13 +438,17 @@ async def pipeline_stats():
             .limit(10)
         )).all()
 
+        # Batch-fetch champion names (avoid N+1)
+        champ_ids = [row[0] for row in top_champs]
+        champ_result = await session.execute(
+            select(Champion).where(Champion.id.in_(champ_ids))
+        )
+        champ_map = {c.id: c.name for c in champ_result.scalars().all()}
+
         top_list = []
         for champ_id, total_games, builds in top_champs:
-            champ = (await session.execute(
-                select(Champion).where(Champion.id == champ_id)
-            )).scalar_one_or_none()
             top_list.append({
-                "champion": champ.name if champ else f"ID:{champ_id}",
+                "champion": champ_map.get(champ_id, f"ID:{champ_id}"),
                 "total_games": total_games,
                 "builds": builds,
             })

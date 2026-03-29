@@ -631,6 +631,15 @@ async def _initialize_game(data: dict):
         _scout_enemies_background(enemies, champ_data)
     )
 
+    def _on_scouting_done(task):
+        if task.cancelled():
+            return
+        exc = task.exception()
+        if exc:
+            logger.error(f"Scouting task failed: {exc}")
+
+    _scouting_task.add_done_callback(_on_scouting_done)
+
 
 def _reset_game_state():
     """Reset enhanced game state for next game."""

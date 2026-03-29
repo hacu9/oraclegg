@@ -22,12 +22,16 @@ async def get_recent_matches(limit: int = 20) -> list[dict]:
         )
         matches = result.scalars().all()
 
+        # Batch-fetch all champion data upfront (avoid N+1)
+        champ_ids = {m.champion_id for m in matches}
+        champ_result = await session.execute(
+            select(Champion).where(Champion.id.in_(champ_ids))
+        )
+        champ_map = {c.id: c for c in champ_result.scalars().all()}
+
         output = []
         for m in matches:
-            champ = (await session.execute(
-                select(Champion).where(Champion.id == m.champion_id)
-            )).scalar_one_or_none()
-
+            champ = champ_map.get(m.champion_id)
             output.append({
                 "match_id": m.match_id,
                 "champion": champ.name if champ else f"ID:{m.champion_id}",
@@ -72,12 +76,16 @@ async def get_champion_stats() -> list[dict]:
         )
         rows = result.all()
 
+        # Batch-fetch champion data (avoid N+1)
+        champ_ids = {row.champion_id for row in rows}
+        champ_result = await session.execute(
+            select(Champion).where(Champion.id.in_(champ_ids))
+        )
+        champ_map = {c.id: c for c in champ_result.scalars().all()}
+
         output = []
         for row in rows:
-            champ = (await session.execute(
-                select(Champion).where(Champion.id == row.champion_id)
-            )).scalar_one_or_none()
-
+            champ = champ_map.get(row.champion_id)
             games = row.games
             wins = row.wins or 0
             output.append({

@@ -83,6 +83,8 @@ class RiotClient:
         app_limit = headers.get("X-App-Rate-Limit")
         if app_limit:
             try:
+                per_sec = 20  # defaults
+                per_long = 100
                 parts = app_limit.split(",")
                 for part in parts:
                     count, seconds = part.split(":")
@@ -91,7 +93,7 @@ class RiotClient:
                     else:
                         per_long = int(count)
                 self.rate_limiter.update_limits(per_sec, per_long)
-            except (ValueError, UnboundLocalError):
+            except ValueError:
                 pass
 
     # ─── Account-V1 ──────────────────────────────────────────────────────

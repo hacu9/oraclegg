@@ -376,15 +376,20 @@ function updateLiveData(state) {
     const objDiv = document.getElementById('objective-content');
 
     if (nextDragon !== 'Unknown') {
-        const dragonColors = {
-            'Infernal': 'oracle-red', 'Mountain': 'oracle-gold', 'Ocean': 'oracle-blue',
-            'Cloud': 'oracle-text', 'Hextech': 'oracle-blue', 'Chemtech': 'oracle-green',
+        // Use prebuilt class maps for Tailwind compatibility (no dynamic string concat)
+        const dragonStyles = {
+            'Infernal':  { bg: 'bg-oracle-red/20', border: 'border-oracle-red/30', text: 'text-oracle-red' },
+            'Mountain':  { bg: 'bg-oracle-gold/20', border: 'border-oracle-gold/30', text: 'text-oracle-gold' },
+            'Ocean':     { bg: 'bg-oracle-blue/20', border: 'border-oracle-blue/30', text: 'text-oracle-blue' },
+            'Cloud':     { bg: 'bg-oracle-text/20', border: 'border-oracle-text/30', text: 'text-oracle-text' },
+            'Hextech':   { bg: 'bg-oracle-blue/20', border: 'border-oracle-blue/30', text: 'text-oracle-blue' },
+            'Chemtech':  { bg: 'bg-oracle-green/20', border: 'border-oracle-green/30', text: 'text-oracle-green' },
         };
-        const color = dragonColors[nextDragon] || 'oracle-gold';
+        const ds = dragonStyles[nextDragon] || dragonStyles['Mountain'];
         objDiv.innerHTML = `
             <div class="flex items-center gap-3 mb-2">
-                <div class="w-10 h-10 rounded-full bg-${color}/20 border border-${color}/30 flex items-center justify-center">
-                    <span class="text-${color} text-lg font-bold">${nextDragon.charAt(0)}</span>
+                <div class="w-10 h-10 rounded-full ${ds.bg} ${ds.border} border flex items-center justify-center">
+                    <span class="${ds.text} text-lg font-bold">${nextDragon.charAt(0)}</span>
                 </div>
                 <div>
                     <div class="text-oracle-light font-bold">${nextDragon} Dragon</div>
@@ -460,23 +465,27 @@ async function evalDragon(type, state) {
         const d = await r.json();
         if (d.error) return;
 
-        const prioColors = { high: 'oracle-green', medium: 'oracle-gold', low: 'oracle-red' };
-        const color = prioColors[d.priority] || 'oracle-gold';
+        const prioStyles = {
+            high:   { bg: 'bg-oracle-green/20', border: 'border-oracle-green/30', text: 'text-oracle-green', borderL: 'border-l-oracle-green/30' },
+            medium: { bg: 'bg-oracle-gold/20', border: 'border-oracle-gold/30', text: 'text-oracle-gold', borderL: 'border-l-oracle-gold/30' },
+            low:    { bg: 'bg-oracle-red/20', border: 'border-oracle-red/30', text: 'text-oracle-red', borderL: 'border-l-oracle-red/30' },
+        };
+        const ps = prioStyles[d.priority] || prioStyles['medium'];
         objDiv.innerHTML = `
             <div class="flex items-center gap-3 mb-2">
-                <div class="w-10 h-10 rounded-full bg-${color}/20 border border-${color}/30 flex items-center justify-center">
-                    <span class="text-${color} text-lg font-bold">${d.type.charAt(0)}</span>
+                <div class="w-10 h-10 rounded-full ${ps.bg} ${ps.border} border flex items-center justify-center">
+                    <span class="${ps.text} text-lg font-bold">${d.type.charAt(0)}</span>
                 </div>
                 <div>
                     <div class="text-oracle-light font-bold">${d.type} Dragon</div>
-                    <div class="text-${color} text-xs font-medium">${d.priority.toUpperCase()} PRIORITY</div>
+                    <div class="${ps.text} text-xs font-medium">${d.priority.toUpperCase()} PRIORITY</div>
                 </div>
             </div>
             <div class="space-y-1 mt-2">
-                ${d.reasons.slice(0, 2).map(r => `<div class="text-oracle-text/70 text-xs pl-2 border-l-2 border-${color}/30">${r}</div>`).join('')}
+                ${d.reasons.slice(0, 2).map(r => `<div class="text-oracle-text/70 text-xs pl-2 border-l-2 ${ps.borderL}">${r}</div>`).join('')}
             </div>
             <div class="mt-2">
-                <span class="bg-${color}/20 text-${color} text-[10px] px-2 py-0.5 rounded-full border border-${color}/30">${d.contest}</span>
+                <span class="${ps.bg} ${ps.text} text-[10px] px-2 py-0.5 rounded-full border ${ps.border}">${d.contest}</span>
             </div>
         `;
     } catch(e) {}

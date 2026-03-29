@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}OracleGG - Champ Select{% endblock %}
+{% block nav_champ_select %}text-oracle-gold{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <h1 class="text-oracle-light text-2xl font-bold">Champ Select</h1>
+        <div class="text-oracle-text text-sm" id="phase-status">
+            Waiting for game...
+        </div>
+    </div>
+
+    <!-- Manual input (for testing without LCU) -->
+    <div class="bg-oracle-card border border-oracle-border rounded-lg p-6">
+        <h2 class="text-oracle-light font-semibold mb-4">Manual Matchup Builder</h2>
+        <form id="matchup-form" class="space-y-4">
+            <!-- Your champion -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="text-oracle-text text-xs uppercase tracking-wider block mb-1">Your Champion</label>
+                    <select id="your-champ" class="w-full bg-oracle-bg border border-oracle-border rounded px-3 py-2
+                                text-oracle-light focus:border-oracle-gold focus:outline-none text-sm">
+                        <option value="">Select...</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-oracle-text text-xs uppercase tracking-wider block mb-1">Your Role</label>
+                    <select id="your-role" class="w-full bg-oracle-bg border border-oracle-border rounded px-3 py-2
+                                text-oracle-light focus:border-oracle-gold focus:outline-none text-sm">
+                        <option value="TOP">Top</option>
+                        <option value="JUNGLE">Jungle</option>
+                        <option value="MID" selected>Mid</option>
+                        <option value="ADC">ADC</option>
+                        <option value="SUPPORT">Support</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Enemy team -->
+            <div>
+                <label class="text-oracle-text text-xs uppercase tracking-wider block mb-2">Enemy Team</label>
+                <div class="grid grid-cols-5 gap-2">
+                    <select class="enemy-champ bg-oracle-bg border border-oracle-border rounded px-2 py-2
+                                text-oracle-light focus:border-oracle-red focus:outline-none text-xs">
+                        <option value="">Top</option>
+                    </select>
+                    <select class="enemy-champ bg-oracle-bg border border-oracle-border rounded px-2 py-2
+                                text-oracle-light focus:border-oracle-red focus:outline-none text-xs">
+                        <option value="">Jungle</option>
+                    </select>
+                    <select class="enemy-champ bg-oracle-bg border border-oracle-border rounded px-2 py-2
+                                text-oracle-light focus:border-oracle-red focus:outline-none text-xs">
+                        <option value="">Mid</option>
+                    </select>
+                    <select class="enemy-champ bg-oracle-bg border border-oracle-border rounded px-2 py-2
+                                text-oracle-light focus:border-oracle-red focus:outline-none text-xs">
+                        <option value="">ADC</option>
+                    </select>
+                    <select class="enemy-champ bg-oracle-bg border border-oracle-border rounded px-2 py-2
+                                text-oracle-light focus:border-oracle-red focus:outline-none text-xs">
+                        <option value="">Support</option>
+                    </select>
+                </div>
+            </div>
+
+            <button type="submit"
+                    class="w-full bg-oracle-gold/20 border border-oracle-gold text-oracle-gold px-4 py-3 rounded
+                           hover:bg-oracle-gold/30 transition-colors text-sm font-medium">
+                Analyze Matchup
+            </button>
+        </form>
+    </div>
+
+    <!-- Results -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Comp analysis -->
+        <div class="bg-oracle-card border border-oracle-border rounded-lg p-6">
+            <h2 class="text-oracle-light font-semibold mb-4">Enemy Comp Analysis</h2>
+            <div id="comp-result" class="text-oracle-text text-sm">
+                Select enemy champions to analyze their composition.
+            </div>
+        </div>
+
+        <!-- Build recommendation -->
+        <div class="bg-oracle-card border border-oracle-border rounded-lg p-6">
+            <h2 class="text-oracle-light font-semibold mb-4">Recommended Build</h2>
+            <div id="build-result" class="text-oracle-text text-sm">
+                Select your champion and enemy team for a build recommendation.
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Auto-redirect to in-game when game starts (respects settings)
+    setInterval(() => {
+        fetch('/api/game-state').then(r => r.json()).then(s => {
+            if (s.phase === 'in_game') {
+                let settings = {};
+                try { settings = JSON.parse(localStorage.getItem('oraclegg_settings')) || {}; } catch {}
+                if (settings.auto_redirect !== false) window.location.href = '/in-game';
+            }
+        }).catch(() => {});
+    }, 3000);
+
+    let champions = [];
+
+    // Load champions
+    fetch('/api/champions')
+        .then(r => r.json())
+        .then(champs => {
+            champions = champs;
+            const yourChamp = document.getElementById('your-champ');
+            const enemySelects = document.querySelectorAll('.enemy-champ');
+
+            function populateSelect(sel, placeholder) {
+                const firstOpt = sel.options[0];
+                sel.innerHTML = '';
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = firstOpt ? firstOpt.textContent : 'Select...';
+                sel.appendChild(opt);
+                champs.forEach(c => {
+                    const o = document.createElement('option');
+                    o.value = c.id;
+                    o.textContent = c.name;
+                    sel.appendChild(o);
+                });
+            }
+
+            populateSelect(yourChamp, 'Your Champion');
+            enemySelects.forEach(sel => populateSelect(sel));
+        });
+
+    // Handle form submit
+    document.getElementById('matchup-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const champId = document.getElementById('your-champ').value;
+        const role = document.getElementById('your-role').value;
+        const enemyIds = Array.from(document.querySelectorAll('.enemy-champ'))
+            .map(s => s.value)
+            .filter(v => v);
+
+        if (!champId) {
+            alert('Select your champion');
+            return;
+        }
+
+        // Classify comp
+        if (enemyIds.length > 0) {
+            const compResp = await fetch(`/api/comp/classify?champion_ids=${enemyIds.join(',')}`);
+            const compData = await compResp.json();
+            const compDiv = document.getElementById('comp-result');
+            let html = '<div class="space-y-2">';
+            html += '<div class="flex flex-wrap gap-1.5">';
+            compData.archetypes.forEach(a => {
+                const colors = {
+                    'heavy_ap': 'purple', 'heavy_ad': 'red', 'heavy_tank': 'blue',
+                    'balanced': 'gold', 'poke': 'green', 'engage': 'red',
+                    'split_push': 'gold', 'protect_carry': 'blue', 'assassin': 'purple',
+                    'early_game': 'red', 'scaling': 'blue',
+                };
+                const color = colors[a] || 'gold';
+                html += `<span class="bg-oracle-${color}/20 text-oracle-${color} text-xs px-2 py-1 rounded-full border border-oracle-${color}/30">
+                    ${a.replace('_', ' ').toUpperCase()}
+                </span>`;
+            });
+            html += '</div></div>';
+            compDiv.innerHTML = html;
+        }
+
+        // Get build
+        const params = new URLSearchParams({
+            champion_id: champId,
+            role: role,
+            enemy_ids: enemyIds.join(','),
+        });
+        const buildResp = await fetch(`/api/recommend/html?${params}`);
+        document.getElementById('build-result').innerHTML = await buildResp.text();
+    });
+</script>
+{% endblock %}

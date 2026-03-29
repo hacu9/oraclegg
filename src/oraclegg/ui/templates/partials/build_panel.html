@@ -1,0 +1,78 @@
+<div class="fade-in space-y-4">
+    {% if rec.get('message') %}
+    <div class="text-oracle-text text-sm p-3 bg-oracle-bg rounded border border-oracle-border">
+        {{ rec.message }}
+    </div>
+    {% else %}
+    {% set ddragon = 'https://ddragon.leagueoflegends.com/cdn/16.6.1/img' %}
+
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <img src="{{ ddragon }}/champion/{{ rec.champion.key }}.png" class="w-12 h-12 rounded-lg border border-oracle-border" alt="{{ rec.champion.name }}" onerror="this.style.display='none'">
+            <div>
+                <span class="text-oracle-light font-bold text-lg">{{ rec.champion.name }}</span>
+                <span class="text-oracle-text text-sm ml-2">{{ rec.role }}</span>
+            </div>
+        </div>
+        <div class="text-right">
+            <span class="{% if rec.win_rate >= 55 %}text-oracle-green{% elif rec.win_rate >= 45 %}text-oracle-gold{% else %}text-oracle-red{% endif %} font-bold text-lg">
+                {{ rec.win_rate }}%
+            </span>
+            <span class="text-oracle-text text-xs block">{{ rec.sample_size }} games</span>
+        </div>
+    </div>
+
+    <!-- Match context -->
+    <div class="text-xs text-oracle-text">
+        <span class="bg-oracle-bg px-2 py-1 rounded border border-oracle-border">
+            vs {{ rec.enemy_archetype | replace('_', ' ') | title }}
+        </span>
+    </div>
+
+    <!-- Build Path -->
+    <div>
+        <h3 class="text-oracle-gold text-xs uppercase tracking-wider mb-2">Build Order</h3>
+        <div class="space-y-1.5">
+            {% for item in rec.build_path %}
+            <div class="flex items-center gap-2">
+                <span class="text-oracle-text/40 w-4 text-right text-xs">{{ loop.index }}</span>
+                <img src="{{ ddragon }}/item/{{ item.id }}.png" class="w-7 h-7 rounded border border-oracle-border/50" alt="{{ item.name }}" onerror="this.style.display='none'">
+                <span class="text-oracle-light text-sm">{{ item.name }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Boots -->
+    {% if rec.boots %}
+    <div>
+        <h3 class="text-oracle-gold text-xs uppercase tracking-wider mb-2">Boots</h3>
+        <div class="flex items-center gap-2">
+            <img src="{{ ddragon }}/item/{{ rec.boots.id }}.png" class="w-7 h-7 rounded border border-oracle-border/50" alt="{{ rec.boots.name }}" onerror="this.style.display='none'">
+            <span class="text-oracle-light text-sm">{{ rec.boots.name }}</span>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Summoner Spells -->
+    <div>
+        <h3 class="text-oracle-gold text-xs uppercase tracking-wider mb-2">Summoner Spells</h3>
+        <div class="flex gap-2 text-sm">
+            {% for spell_id in rec.summoner_spells %}
+            <span class="bg-oracle-bg px-2 py-1 rounded border border-oracle-border text-oracle-light">
+                {% if spell_id == 4 %}Flash{% elif spell_id == 14 %}Ignite{% elif spell_id == 12 %}Teleport{% elif spell_id == 11 %}Smite{% elif spell_id == 3 %}Exhaust{% elif spell_id == 7 %}Heal{% elif spell_id == 6 %}Ghost{% elif spell_id == 1 %}Cleanse{% elif spell_id == 21 %}Barrier{% else %}Spell {{ spell_id }}{% endif %}
+            </span>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Patch info -->
+    <div class="text-oracle-text/40 text-xs pt-2 border-t border-oracle-border">
+        Patch {{ rec.patch }}
+        {% if rec.get('enemy_archetypes_detected') %}
+        | Detected: {{ rec.enemy_archetypes_detected | join(', ') }}
+        {% endif %}
+    </div>
+    {% endif %}
+</div>

@@ -1,0 +1,128 @@
+<div class="fade-in bg-oracle-bg border border-oracle-border rounded-lg p-4 space-y-3">
+    {% if player.get('error') %}
+    <div class="text-oracle-red text-sm">Error: {{ player.error }}</div>
+    {% else %}
+    <!-- Player header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <span class="text-oracle-light font-bold">{{ player.game_name }}</span>
+            <span class="text-oracle-text text-sm">#{{ player.tag_line }}</span>
+        </div>
+        <div class="text-right">
+            {% if player.rank %}
+            <span class="text-oracle-gold text-sm font-medium">{{ player.rank }}</span>
+            {% else %}
+            <span class="text-oracle-text text-sm">Unranked</span>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if player.level %}
+    <div class="text-oracle-text text-xs">Level {{ player.level }}</div>
+    {% endif %}
+
+    <!-- Tendencies -->
+    {% if player.tendencies %}
+    <div class="flex flex-wrap gap-1.5">
+        {% if player.tendencies.get('tilted') %}
+        <span class="bg-oracle-red/20 text-oracle-red text-xs px-2 py-0.5 rounded-full border border-oracle-red/30">
+            TILTED ({{ player.tendencies.tilted.loss_streak }}L streak)
+        </span>
+        {% endif %}
+
+        {% if player.tendencies.get('first_timing') %}
+        <span class="bg-oracle-purple/20 text-oracle-purple text-xs px-2 py-0.5 rounded-full border border-oracle-purple/30">
+            FIRST TIMING
+        </span>
+        {% endif %}
+
+        {% if player.tendencies.get('one_trick') %}
+        <span class="bg-oracle-gold/20 text-oracle-gold text-xs px-2 py-0.5 rounded-full border border-oracle-gold/30">
+            OTP: {{ player.tendencies.one_trick.champion_name }} ({{ player.tendencies.one_trick.pct }}%)
+        </span>
+        {% endif %}
+
+        {% if player.tendencies.get('hot_streak') %}
+        <span class="bg-oracle-green/20 text-oracle-green text-xs px-2 py-0.5 rounded-full border border-oracle-green/30">
+            HOT STREAK
+        </span>
+        {% endif %}
+
+        {% if player.tendencies.get('cold_streak') %}
+        <span class="bg-oracle-red/20 text-oracle-red text-xs px-2 py-0.5 rounded-full border border-oracle-red/30">
+            COLD STREAK
+        </span>
+        {% endif %}
+
+        {% if player.tendencies.get('playstyle') %}
+        <span class="bg-oracle-blue/20 text-oracle-blue text-xs px-2 py-0.5 rounded-full border border-oracle-blue/30">
+            {{ player.tendencies.playstyle | upper }}
+        </span>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Current champion mastery -->
+    {% if player.current_champion_mastery %}
+    <div class="text-xs text-oracle-text">
+        Champion Mastery: Level {{ player.current_champion_mastery.level }}
+        ({{ "{:,}".format(player.current_champion_mastery.points) }} pts)
+    </div>
+    {% endif %}
+
+    <!-- Current champ stats -->
+    {% if player.tendencies.get('current_champ_stats') %}
+    {% set cs = player.tendencies.current_champ_stats %}
+    <div class="text-xs">
+        <span class="text-oracle-text">On this champ:</span>
+        <span class="{% if cs.win_rate >= 55 %}text-oracle-green{% elif cs.win_rate >= 45 %}text-oracle-gold{% else %}text-oracle-red{% endif %} font-medium">
+            {{ cs.win_rate }}% WR
+        </span>
+        <span class="text-oracle-text/60">({{ cs.games }} games)</span>
+    </div>
+    {% endif %}
+
+    <!-- KDA -->
+    {% if player.tendencies.get('kda') %}
+    {% set kda = player.tendencies.kda %}
+    <div class="text-xs text-oracle-text">
+        KDA: <span class="text-oracle-light">{{ kda.avg_kills }}/{{ kda.avg_deaths }}/{{ kda.avg_assists }}</span>
+        <span class="{% if kda.kda >= 3 %}text-oracle-green{% elif kda.kda >= 2 %}text-oracle-gold{% else %}text-oracle-red{% endif %}">
+            ({{ kda.kda }} KDA)
+        </span>
+    </div>
+    {% endif %}
+
+    <!-- Recent win rate -->
+    {% if player.tendencies.get('recent_winrate') %}
+    {% set wr = player.tendencies.recent_winrate %}
+    <div class="text-xs text-oracle-text">
+        Recent: <span class="{% if wr.pct >= 55 %}text-oracle-green{% elif wr.pct >= 45 %}text-oracle-gold{% else %}text-oracle-red{% endif %}">{{ wr.pct }}% WR</span>
+        <span class="text-oracle-text/60">({{ wr.wins }}W {{ wr.losses }}L)</span>
+    </div>
+    {% endif %}
+
+    <!-- Recent matches -->
+    {% if player.recent_matches %}
+    <div class="flex gap-0.5">
+        {% for m in player.recent_matches[:10] %}
+        <div class="w-6 h-6 rounded text-xs flex items-center justify-center font-medium
+                    {% if m.win %}bg-oracle-green/20 text-oracle-green border border-oracle-green/30
+                    {% else %}bg-oracle-red/20 text-oracle-red border border-oracle-red/30{% endif %}">
+            {{ 'W' if m.win else 'L' }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Top mastery -->
+    {% if player.mastery %}
+    <div class="text-xs text-oracle-text/60">
+        Top mastery:
+        {% for m in player.mastery[:3] %}
+        ChampID {{ m.champion_id }} (Lvl {{ m.level }}){% if not loop.last %}, {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endif %}
+</div>

@@ -1,0 +1,312 @@
+{% extends "base.html" %}
+{% block title %}OracleGG - Settings{% endblock %}
+{% block nav_settings %}text-oracle-gold{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <h1 class="text-oracle-light text-2xl font-bold">Settings</h1>
+
+    <!-- Tip Categories -->
+    <div class="bg-oracle-card border border-oracle-border rounded-lg p-6">
+        <h2 class="text-oracle-light font-semibold mb-2">Tip Notifications</h2>
+        <p class="text-oracle-text/60 text-sm mb-4">Toggle which types of coaching tips you see during games.</p>
+
+        <div class="space-y-3" id="tip-toggles">
+            <div class="flex items-center justify-between py-2 px-3 rounded bg-oracle-bg border border-oracle-border">
+                <div>
+                    <span class="text-oracle-light text-sm font-medium">Item Power Spikes</span>
+                    <span class="text-oracle-text/40 text-xs block">Enemy completed Infinity Edge, Rabadon's, etc.</span>
+                </div>
+                <label class="toggle">
+                    <input type="checkbox" data-category="item" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="flex items-center justify-between py-2 px-3 rounded bg-oracle-bg border border-oracle-border">
+                <div>
+                    <span class="text-oracle-light text-sm font-medium">Threat Alerts</span>
+                    <span class="text-oracle-text/40 text-xs block">Fed enemy warnings, scaling champion threats</span>
+                </div>
+                <label class="toggle">
+                    <input type="checkbox" data-category="threat" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="flex items-center justify-between py-2 px-3 rounded bg-oracle-bg border border-oracle-border">
+                <div>
+                    <span class="text-oracle-light text-sm font-medium">Build Advice</span>
+                    <span class="text-oracle-text/40 text-xs block">Boot recommendations, armor/MR suggestions, anti-heal reminders</span>
+                </div>
+                <label class="toggle">
+                    <input type="checkbox" data-category="build" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="flex items-center justify-between py-2 px-3 rounded bg-oracle-bg border border-oracle-border">
+                <div>
+                    <span class="text-oracle-light text-sm font-medium">Objective Timers</span>
+                    <span class="text-oracle-text/40 text-xs block">Dragon, Baron, Herald spawn warnings</span>
+                </div>
+                <label class="toggle">
+                    <input type="checkbox" data-category="objective" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="flex items-center justify-between py-2 px-3 rounded bg-oracle-bg border border-oracle-border">
+                <div>
+                    <span class="text-oracle-light text-sm font-medium">Strategy Tips</span>
+                    <span class="text-oracle-text/40 text-xs block">Scaling advice, teamfight vs split push, game tempo</span>
+                </div>
+                <label class="toggle">
+                    <input type="checkbox" data-category="strategy" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tip Priority Filter -->
+    <div class="bg-oracle-card border border-oracle-border rounded-lg p-6">
+        <h2 class="text-oracle-light font-semibold mb-2">Minimum Priority</h2>
+        <p class="text-oracle-text/60 text-sm mb-4">Only show tips at or above this priority level.</p>
+
+        <div class="flex gap-3">
+            <button class="prio-btn px-4 py-2 rounded border text-sm font-medium transition-colors" data-prio="0">
+                All Tips
+            </button>
+            <button class="prio-btn px-4 py-2 rounded border text-sm font-medium transition-colors" data-prio="1">
+                Important + Urgent
+            </button>
+            <button class="prio-btn px-4 py-2 rounded border text-sm font-medium transition-colors" data-prio="0">
+                Urgent Only
+            </button>
+        </div>
+    </div>
+
+    <!-- API Key -->
+    <div class="bg-oracle-card border border-oracle-border rounded-lg p-6">
+        <h2 class="text-oracle-light font-semibold mb-2">Riot API Key</h2>
+        <p class="text-oracle-text/60 text-sm mb-4">Get a free key at <a href="https://developer.riotgames.com/" target="_blank" class="text-oracle-blue hover:underline">developer.riotgames.com</a>. Dev keys expire every 24 hours.</p>
+
+        <form id="api-key-form" class="flex gap-2">
+            <input type="text" id="api-key-input" placeholder="RGAPI-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                   class="flex-1 bg-oracle-bg border border-oracle-border rounded px-3 py-2 text-oracle-light
+                          placeholder-oracle-text/30 focus:border-oracle-gold focus:outline-none text-sm font-mono">
+            <button type="submit"
+                    class="bg-oracle-gold/20 border border-oracle-gold text-oracle-gold px-4 py-2 rounded
+                           hover:bg-oracle-gold/30 transition-colors text-sm font-medium" id="save-key-btn">
+                Save
+            </button>
+        </form>
+        <div id="key-status" class="text-xs mt-2"></div>
+    </div>
+
+    <!-- Summoner -->
+    <div class="bg-oracle-card border border-oracle-border rounded-lg p-6">
+        <h2 class="text-oracle-light font-semibold mb-2">Summoner</h2>
+        <p class="text-oracle-text/60 text-sm mb-4">Your Riot ID for personal tracking and post-game analysis.</p>
+
+        <form id="summoner-form" class="flex gap-2">
+            <input type="text" id="summoner-name" placeholder="GameName"
+                   class="flex-1 bg-oracle-bg border border-oracle-border rounded px-3 py-2 text-oracle-light
+                          placeholder-oracle-text/30 focus:border-oracle-gold focus:outline-none text-sm">
+            <input type="text" id="summoner-tag" placeholder="Tag" value=""
+                   class="w-20 bg-oracle-bg border border-oracle-border rounded px-3 py-2 text-oracle-light
+                          placeholder-oracle-text/30 focus:border-oracle-gold focus:outline-none text-sm">
+            <button type="submit"
+                    class="bg-oracle-blue/20 border border-oracle-blue text-oracle-blue px-4 py-2 rounded
+                           hover:bg-oracle-blue/30 transition-colors text-sm font-medium">
+                Save
+            </button>
+        </form>
+        <div id="summoner-status" class="text-xs mt-2"></div>
+    </div>
+
+    <!-- General -->
+    <div class="bg-oracle-card border border-oracle-border rounded-lg p-6">
+        <h2 class="text-oracle-light font-semibold mb-2">General</h2>
+
+        <div class="space-y-3">
+            <div class="flex items-center justify-between py-2 px-3 rounded bg-oracle-bg border border-oracle-border">
+                <div>
+                    <span class="text-oracle-light text-sm font-medium">Auto-redirect to In-Game</span>
+                    <span class="text-oracle-text/40 text-xs block">Automatically switch to in-game view when a game starts</span>
+                </div>
+                <label class="toggle">
+                    <input type="checkbox" data-setting="auto_redirect" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="flex items-center justify-between py-2 px-3 rounded bg-oracle-bg border border-oracle-border">
+                <div>
+                    <span class="text-oracle-light text-sm font-medium">Post-Game Auto-Analysis</span>
+                    <span class="text-oracle-text/40 text-xs block">Automatically analyze your match when a game ends</span>
+                </div>
+                <label class="toggle">
+                    <input type="checkbox" data-setting="auto_postgame" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="text-oracle-text/30 text-xs">Settings are saved automatically and persist across sessions.</div>
+</div>
+
+<style>
+.toggle { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; cursor: pointer; inset: 0; background: #1e2a36; border-radius: 24px; transition: 0.2s; }
+.slider:before { content: ""; position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px; background: #a09b8c; border-radius: 50%; transition: 0.2s; }
+input:checked + .slider { background: rgba(200, 155, 60, 0.4); }
+input:checked + .slider:before { transform: translateX(20px); background: #c89b3c; }
+.prio-btn { border-color: #1e2a36; color: #a09b8c; background: #0a0e14; }
+.prio-btn.active { border-color: #c89b3c; color: #c89b3c; background: rgba(200, 155, 60, 0.1); }
+</style>
+
+<script>
+// Load current API key status
+fetch('/api/settings/account').then(r => r.json()).then(d => {
+    if (d.api_key_set) {
+        document.getElementById('key-status').innerHTML = '<span class="text-oracle-green">Key is set. ' + (d.api_key_preview || '') + '</span>';
+    } else {
+        document.getElementById('key-status').innerHTML = '<span class="text-oracle-red">No API key configured.</span>';
+    }
+    if (d.summoner_name) {
+        document.getElementById('summoner-name').value = d.summoner_name;
+        document.getElementById('summoner-tag').value = d.summoner_tag || '';
+        document.getElementById('summoner-status').innerHTML = `<span class="text-oracle-green">Tracking: ${d.summoner_name}#${d.summoner_tag}</span>`;
+    }
+}).catch(() => {});
+
+// Save API key
+document.getElementById('api-key-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const key = document.getElementById('api-key-input').value.trim();
+    if (!key) return;
+    const btn = document.getElementById('save-key-btn');
+    btn.textContent = 'Saving...';
+    try {
+        const r = await fetch('/api/settings/api-key', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key }),
+        });
+        const d = await r.json();
+        if (d.valid) {
+            document.getElementById('key-status').innerHTML = '<span class="text-oracle-green">Key saved and verified.</span>';
+            document.getElementById('api-key-input').value = '';
+        } else {
+            document.getElementById('key-status').innerHTML = `<span class="text-oracle-red">Invalid key: ${d.error || 'check and try again'}</span>`;
+        }
+    } catch {
+        document.getElementById('key-status').innerHTML = '<span class="text-oracle-red">Failed to save.</span>';
+    }
+    btn.textContent = 'Save';
+});
+
+// Save summoner
+document.getElementById('summoner-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = document.getElementById('summoner-name').value.trim();
+    const tag = document.getElementById('summoner-tag').value.trim();
+    if (!name || !tag) return;
+    try {
+        const r = await fetch('/api/settings/summoner', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, tag }),
+        });
+        const d = await r.json();
+        if (d.ok) {
+            document.getElementById('summoner-status').innerHTML = `<span class="text-oracle-green">Saved: ${name}#${tag}</span>`;
+        } else {
+            document.getElementById('summoner-status').innerHTML = `<span class="text-oracle-red">${d.error || 'Failed'}</span>`;
+        }
+    } catch {
+        document.getElementById('summoner-status').innerHTML = '<span class="text-oracle-red">Failed to save.</span>';
+    }
+});
+
+const SETTINGS_KEY = 'oraclegg_settings';
+
+function loadSettings() {
+    try {
+        return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || getDefaults();
+    } catch { return getDefaults(); }
+}
+
+function getDefaults() {
+    return {
+        categories: { item: true, threat: true, build: true, objective: true, strategy: true },
+        min_priority: 0,
+        auto_redirect: true,
+        auto_postgame: true,
+    };
+}
+
+function saveSettings(s) {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+    // Also save to server for the tip engine
+    fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(s),
+    });
+}
+
+// Initialize
+const settings = loadSettings();
+
+// Category toggles
+document.querySelectorAll('[data-category]').forEach(cb => {
+    const cat = cb.dataset.category;
+    cb.checked = settings.categories[cat] !== false;
+    cb.addEventListener('change', () => {
+        settings.categories[cat] = cb.checked;
+        saveSettings(settings);
+    });
+});
+
+// General toggles
+document.querySelectorAll('[data-setting]').forEach(cb => {
+    const key = cb.dataset.setting;
+    cb.checked = settings[key] !== false;
+    cb.addEventListener('change', () => {
+        settings[key] = cb.checked;
+        saveSettings(settings);
+    });
+});
+
+// Priority buttons
+document.querySelectorAll('.prio-btn').forEach((btn, i) => {
+    const vals = [0, 1, 0]; // All, Important+, Urgent
+    const labels = ['all', 'important', 'urgent'];
+    if (i === 0 && settings.min_priority === 0) btn.classList.add('active');
+    if (i === 1 && settings.min_priority === 1) btn.classList.add('active');
+    if (i === 2 && settings.min_priority === 0 && settings.urgent_only) btn.classList.add('active');
+
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.prio-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        if (i === 2) {
+            settings.min_priority = 0;
+            settings.urgent_only = true;
+        } else {
+            settings.min_priority = vals[i];
+            settings.urgent_only = false;
+        }
+        saveSettings(settings);
+    });
+});
+
+// Set initial active state
+const activePrio = settings.urgent_only ? 2 : (settings.min_priority === 1 ? 1 : 0);
+document.querySelectorAll('.prio-btn')[activePrio]?.classList.add('active');
+</script>
+{% endblock %}

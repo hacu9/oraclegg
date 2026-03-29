@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}OracleGG{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        oracle: {
+                            bg: '#0a0e14',
+                            card: '#131920',
+                            border: '#1e2a36',
+                            accent: '#c89b3c',
+                            gold: '#c89b3c',
+                            blue: '#0ac8b9',
+                            red: '#e84057',
+                            green: '#28c76f',
+                            purple: '#9b59b6',
+                            text: '#a09b8c',
+                            light: '#f0e6d2',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background: #0a0e14; font-family: 'Segoe UI', system-ui, sans-serif; }
+        .glow { box-shadow: 0 0 20px rgba(200, 155, 60, 0.15); }
+        .card-hover:hover { border-color: #c89b3c; transition: border-color 0.2s; }
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .htmx-indicator { display: none; }
+        .htmx-request .htmx-indicator { display: inline-block; }
+        .htmx-request.htmx-indicator { display: inline-block; }
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #131920; }
+        ::-webkit-scrollbar-thumb { background: #1e2a36; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #c89b3c; }
+    </style>
+</head>
+<body class="text-oracle-text min-h-screen">
+    <!-- Nav -->
+    <nav class="border-b border-oracle-border bg-oracle-card/80 backdrop-blur-sm sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <a href="/" class="flex items-center gap-2">
+                <span class="text-oracle-gold font-bold text-xl tracking-wide">ORACLE</span>
+                <span class="text-oracle-blue font-light text-xl">.GG</span>
+            </a>
+            <div class="flex gap-6 text-sm">
+                <a href="/" class="hover:text-oracle-light transition-colors {% block nav_dashboard %}{% endblock %}">Dashboard</a>
+                <a href="/champ-select" class="hover:text-oracle-light transition-colors {% block nav_champ_select %}{% endblock %}">Champ Select</a>
+                <a href="/in-game" class="hover:text-oracle-light transition-colors {% block nav_in_game %}{% endblock %}">In-Game</a>
+                <a href="/tracking" class="hover:text-oracle-light transition-colors {% block nav_tracking %}{% endblock %}">Tracking</a>
+                <a href="/settings" class="hover:text-oracle-light transition-colors {% block nav_settings %}{% endblock %}">Settings</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Update banner -->
+    <div id="update-banner" style="display:none" class="bg-oracle-gold/10 border-b border-oracle-gold/30 px-4 py-2">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <span class="text-oracle-gold text-sm">
+                New version <strong id="update-version"></strong> available!
+            </span>
+            <div class="flex gap-2">
+                <button onclick="applyUpdate()" id="update-btn"
+                        class="bg-oracle-gold/20 border border-oracle-gold text-oracle-gold px-3 py-1 rounded text-xs hover:bg-oracle-gold/30">
+                    Update Now
+                </button>
+                <button onclick="document.getElementById('update-banner').style.display='none'"
+                        class="text-oracle-text/40 text-xs hover:text-oracle-text">Dismiss</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main content -->
+    <main class="max-w-7xl mx-auto px-4 py-6">
+        {% block content %}{% endblock %}
+    </main>
+
+    <script>
+    // Check for updates on page load
+    fetch('/api/update/check').then(r=>r.json()).then(d=>{
+        if(d.available && d.url){
+            document.getElementById('update-version').textContent = d.version;
+            document.getElementById('update-banner').style.display = 'block';
+            window._updateUrl = d.url;
+        }
+    }).catch(()=>{});
+
+    async function applyUpdate(){
+        if(!window._updateUrl) return;
+        const btn = document.getElementById('update-btn');
+        btn.textContent = 'Updating...';
+        btn.disabled = true;
+        try {
+            const r = await fetch('/api/update/apply', {
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({url: window._updateUrl})
+            });
+            const d = await r.json();
+            if(d.ok){
+                btn.textContent = 'Restarting...';
+                setTimeout(()=>location.reload(), 3000);
+            } else {
+                btn.textContent = 'Failed';
+            }
+        } catch {
+            btn.textContent = 'Failed';
+        }
+    }
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

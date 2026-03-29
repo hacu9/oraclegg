@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+{% block title %}OracleGG - Tracking{% endblock %}
+{% block nav_tracking %}text-oracle-gold{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <h1 class="text-oracle-light text-2xl font-bold">Performance Tracking</h1>
+
+    <!-- Overview stats -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3" id="overview">
+        <div class="bg-oracle-card border border-oracle-border rounded-lg p-4 text-center">
+            <div class="text-oracle-text text-xs uppercase">Games</div>
+            <div class="text-oracle-light text-2xl font-bold" id="stat-games">-</div>
+        </div>
+        <div class="bg-oracle-card border border-oracle-border rounded-lg p-4 text-center">
+            <div class="text-oracle-text text-xs uppercase">Win Rate</div>
+            <div class="text-2xl font-bold" id="stat-wr">-</div>
+        </div>
+        <div class="bg-oracle-card border border-oracle-border rounded-lg p-4 text-center">
+            <div class="text-oracle-text text-xs uppercase">Avg KDA</div>
+            <div class="text-2xl font-bold" id="stat-kda">-</div>
+        </div>
+        <div class="bg-oracle-card border border-oracle-border rounded-lg p-4 text-center">
+            <div class="text-oracle-text text-xs uppercase">Avg CS/min</div>
+            <div class="text-oracle-light text-2xl font-bold" id="stat-cs">-</div>
+        </div>
+        <div class="bg-oracle-card border border-oracle-border rounded-lg p-4 text-center">
+            <div class="text-oracle-text text-xs uppercase">Avg Vision</div>
+            <div class="text-oracle-light text-2xl font-bold" id="stat-vision">-</div>
+        </div>
+    </div>
+
+    <!-- Champion stats -->
+    <div class="bg-oracle-card border border-oracle-border rounded-lg p-6">
+        <h2 class="text-oracle-light font-semibold mb-4">Champion Performance</h2>
+        <div id="champ-stats" class="text-oracle-text text-sm">Loading...</div>
+    </div>
+
+    <!-- Match history -->
+    <div class="bg-oracle-card border border-oracle-border rounded-lg p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-oracle-light font-semibold">Recent Matches</h2>
+            <button onclick="analyzeAll()" id="analyze-btn"
+                    class="bg-oracle-gold/20 border border-oracle-gold text-oracle-gold px-3 py-1 rounded text-xs hover:bg-oracle-gold/30 transition-colors">
+                Analyze All
+            </button>
+        </div>
+        <div id="match-history" class="text-oracle-text text-sm">Loading...</div>
+    </div>
+
+    <!-- Analysis panel (shown when clicking a match) -->
+    <div class="bg-oracle-card border border-oracle-gold/30 rounded-lg p-6 glow" id="analysis-panel" style="display:none">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-oracle-gold font-semibold">Match Analysis</h2>
+            <button onclick="document.getElementById('analysis-panel').style.display='none'"
+                    class="text-oracle-text/40 hover:text-oracle-text text-sm">Close</button>
+        </div>
+        <div id="analysis-content" class="text-oracle-text text-sm"></div>
+    </div>
+</div>
+
+<script>
+const DDRAGON = 'https://ddragon.leagueoflegends.com/cdn/16.6.1/img';
+
+const CHAMP_ICON_MAP = {
+    'MonkeyKing': 'MonkeyKing', 'Wukong': 'MonkeyKing',
+    "Kai'Sa": 'Kaisa', "Kha'Zix": 'Khazix', "Bel'Veth": 'Belveth',
+    "Vel'Koz": 'Velkoz', "Kog'Maw": 'KogMaw', "Cho'Gath": 'Chogath',
+    "Rek'Sai": 'RekSai', "K'Sante": 'KSante', "Renata Glasc": 'Renata',
+    "Nunu & Willump": 'Nunu', "LeBlanc": 'Leblanc',
+};
+function champIconKey(name) { return CHAMP_ICON_MAP[name] || name; }
+
+function wrColor(wr) {
+    if (wr >= 55) return 'text-oracle-green';
+    if (wr >= 50) return 'text-oracle-gold';
+    return 'text-oracle-red';
+}
+
+function kdaColor(kda) {
+    if (kda >= 4) return 'text-oracle-green';
+    if (kda >= 2.5) return 'text-oracle-gold';
+    return 'text-oracle-red';
+}
+
+// Load overview
+fetch('/api/tracking/overview').then(r => r.json()).then(d => {
+    document.getElementById('stat-games').textContent = d.total_games || 0;
+    const wr = document.getElementById('stat-wr');
+    wr.textContent = d.win_rate + '%';
+    wr.className = `text-2xl font-bold ${wrColor(d.win_rate)}`;
+    const kda = document.getElementById('stat-kda');
+    kda.textContent = d.avg_kda;
+    kda.className = `text-2xl font-bold ${kdaColor(d.avg_kda)}`;
+    document.getElementById('stat-cs').textContent = d.avg_cs_min;
+    document.getElementById('stat-vision').textContent = d.avg_vision;
+});
+
+// Load champion stats
+fetch('/api/tracking/champions').then(r => r.json()).then(champs => {
+    if (!champs.length) {
+        document.getElementById('champ-stats').innerHTML = '<span class="text-oracle-text/50">No data yet. Play some games and they will appear here.</span>';
+        return;
+    }
+    let html = '<div class="space-y-2">';
+    champs.forEach(c => {
+        const icon = `${DDRAGON}/champion/${champIconKey(c.champion_key || c.champion)}.png`;
+        html += `
+            <div class="flex items-center justify-between py-2 px-3 rounded hover:bg-oracle-bg transition-colors">
+                <div class="flex items-center gap-3">
+                    <img src="${icon}" class="w-8 h-8 rounded border border-oracle-border" onerror="this.style.display='none'">
+                    <span class="text-oracle-light font-medium">${c.champion}</span>
+                    <span class="text-oracle-text/40 text-xs">${c.games} games</span>
+                </div>
+                <div class="flex items-center gap-4 text-sm">
+                    <span class="${wrColor(c.win_rate)} font-bold">${c.win_rate}%</span>
+                    <span class="text-oracle-text/60">${c.wins}W ${c.losses}L</span>
+                    <span class="${kdaColor(c.avg_kda)}">${c.avg_kda} KDA</span>
+                    <span class="text-oracle-text/40">${c.avg_cs_min} cs/m</span>
+                </div>
+            </div>
+        `;
+    });
+    html += '</div>';
+    document.getElementById('champ-stats').innerHTML = html;
+});
+
+// Analyze all matches
+async function analyzeAll() {
+    const btn = document.getElementById('analyze-btn');
+    btn.textContent = 'Analyzing...';
+    btn.disabled = true;
+    try {
+        const r = await fetch('/api/tracking/analyze-all', { method: 'POST' });
+        const d = await r.json();
+        btn.textContent = `Done (${d.analyzed} analyzed)`;
+        setTimeout(() => { btn.textContent = 'Analyze All'; btn.disabled = false; }, 3000);
+    } catch(e) {
+        btn.textContent = 'Error';
+        setTimeout(() => { btn.textContent = 'Analyze All'; btn.disabled = false; }, 3000);
+    }
+}
+
+// Show match analysis
+async function showAnalysis(matchId) {
+    const panel = document.getElementById('analysis-panel');
+    const content = document.getElementById('analysis-content');
+    panel.style.display = 'block';
+    content.innerHTML = '<span class="text-oracle-text/50">Loading analysis...</span>';
+    panel.scrollIntoView({ behavior: 'smooth' });
+
+    try {
+        const r = await fetch(`/api/tracking/analysis/${matchId}`);
+        const data = await r.json();
+
+        if (data.error) {
+            content.innerHTML = `<span class="text-oracle-red">${data.error}</span>`;
+            return;
+        }
+
+        const ratingColors = {
+            'excellent': 'text-oracle-green',
+            'good': 'text-oracle-blue',
+            'average': 'text-oracle-gold',
+            'needs improvement': 'text-oracle-red',
+            'below average': 'text-oracle-red',
+            'poor': 'text-oracle-red',
+        };
+
+        let html = '';
+        for (const section of data.sections) {
+            const ratingBadge = section.rating
+                ? `<span class="${ratingColors[section.rating] || 'text-oracle-text'} text-xs ml-2 uppercase font-bold">${section.rating}</span>`
+                : '';
+
+            html += `
+                <div class="mb-4">
+                    <h3 class="text-oracle-light font-medium text-sm mb-1">${section.title}${ratingBadge}</h3>
+                    <p class="text-oracle-text text-sm">${section.content}</p>
+                    ${section.details && section.details.length ? `
+                        <ul class="mt-1.5 space-y-1">
+                            ${section.details.map(d => `
+                                <li class="text-oracle-text/80 text-sm pl-3 border-l-2 border-oracle-border">${d}</li>
+                            `).join('')}
+                        </ul>
+                    ` : ''}
+                </div>
+            `;
+        }
+        content.innerHTML = html;
+    } catch(e) {
+        content.innerHTML = '<span class="text-oracle-red">Failed to load analysis</span>';
+    }
+}
+
+// Load match history
+fetch('/api/tracking/matches').then(r => r.json()).then(matches => {
+    if (!matches.length) {
+        document.getElementById('match-history').innerHTML = '<span class="text-oracle-text/50">No matches tracked yet. Play a game with OracleGG running.</span>';
+        return;
+    }
+    let html = '<div class="space-y-1">';
+    matches.forEach(m => {
+        const icon = `${DDRAGON}/champion/${champIconKey(m.champion_key || m.champion)}.png`;
+        const winClass = m.win ? 'border-l-oracle-green bg-oracle-green/5' : 'border-l-oracle-red bg-oracle-red/5';
+        const mins = Math.floor(m.game_duration / 60);
+        html += `
+            <div class="flex items-center justify-between py-2 px-3 rounded border-l-4 ${winClass} cursor-pointer hover:bg-oracle-border/20 transition-colors" onclick="showAnalysis('${m.match_id}')">
+                <div class="flex items-center gap-3">
+                    <img src="${icon}" class="w-7 h-7 rounded border border-oracle-border" onerror="this.style.display='none'">
+                    <div>
+                        <span class="text-oracle-light text-sm font-medium">${m.champion}</span>
+                        <span class="text-oracle-text/40 text-xs ml-1">${m.role}</span>
+                    </div>
+                    <span class="${m.win ? 'text-oracle-green' : 'text-oracle-red'} text-xs font-bold">${m.win ? 'WIN' : 'LOSS'}</span>
+                </div>
+                <div class="flex items-center gap-4 text-sm">
+                    <span class="${kdaColor(m.kda_ratio)} font-mono">${m.kda}</span>
+                    <span class="text-oracle-text/50 text-xs">${m.cs}cs (${m.cs_per_min}/m)</span>
+                    <span class="text-oracle-text/30 text-xs">${mins}m</span>
+                </div>
+            </div>
+        `;
+    });
+    html += '</div>';
+    document.getElementById('match-history').innerHTML = html;
+});
+</script>
+{% endblock %}

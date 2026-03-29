@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% block title %}OracleGG - Dashboard{% endblock %}
+{% block nav_dashboard %}text-oracle-gold{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Hero -->
+    <div class="text-center py-8">
+        <h1 class="text-4xl font-bold text-oracle-light">
+            <span class="text-oracle-gold">ORACLE</span><span class="text-oracle-blue">.GG</span>
+        </h1>
+        <p class="text-oracle-text mt-2">Real-time League of Legends coaching</p>
+    </div>
+
+    <!-- Stats cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-oracle-card border border-oracle-border rounded-lg p-6 glow">
+            <div class="text-oracle-text text-sm uppercase tracking-wider">Build Recommendations</div>
+            <div class="text-3xl font-bold text-oracle-light mt-1">{{ build_count }}</div>
+            <div class="text-oracle-text text-xs mt-1">Aggregated from Master+ matches</div>
+        </div>
+        <div class="bg-oracle-card border border-oracle-border rounded-lg p-6">
+            <div class="text-oracle-text text-sm uppercase tracking-wider">Champions</div>
+            <div class="text-3xl font-bold text-oracle-light mt-1">{{ champion_count }}</div>
+            <div class="text-oracle-text text-xs mt-1">With full stats and abilities</div>
+        </div>
+        <div class="bg-oracle-card border border-oracle-border rounded-lg p-6" id="game-phase-card">
+            <div class="text-oracle-text text-sm uppercase tracking-wider">Game Phase</div>
+            <div class="text-3xl font-bold mt-1" id="game-phase-text">...</div>
+            <div class="text-oracle-text text-xs mt-1" id="game-phase-detail">Checking...</div>
+        </div>
+    </div>
+
+    <!-- Quick actions -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Scout a player -->
+        <div class="bg-oracle-card border border-oracle-border rounded-lg p-6 card-hover">
+            <h2 class="text-oracle-light font-semibold mb-4">Scout a Player</h2>
+            <form hx-get="/api/scout/html" hx-target="#scout-result" hx-indicator="#scout-loading"
+                  class="flex gap-2">
+                <input type="text" name="name" placeholder="Summoner Name"
+                       class="flex-1 bg-oracle-bg border border-oracle-border rounded px-3 py-2 text-oracle-light
+                              placeholder-oracle-text/50 focus:border-oracle-gold focus:outline-none text-sm">
+                <input type="text" name="tag" placeholder="Tag" value="LAN"
+                       class="w-20 bg-oracle-bg border border-oracle-border rounded px-3 py-2 text-oracle-light
+                              placeholder-oracle-text/50 focus:border-oracle-gold focus:outline-none text-sm">
+                <button type="submit"
+                        class="bg-oracle-gold/20 border border-oracle-gold text-oracle-gold px-4 py-2 rounded
+                               hover:bg-oracle-gold/30 transition-colors text-sm font-medium">
+                    Scout
+                </button>
+            </form>
+            <div id="scout-loading" class="htmx-indicator mt-4 text-oracle-text text-sm">
+                Scouting...
+            </div>
+            <div id="scout-result" class="mt-4"></div>
+        </div>
+
+        <!-- Get a build -->
+        <div class="bg-oracle-card border border-oracle-border rounded-lg p-6 card-hover">
+            <h2 class="text-oracle-light font-semibold mb-4">Get Build Recommendation</h2>
+            <form hx-get="/api/recommend/html" hx-target="#build-result" hx-indicator="#build-loading"
+                  class="space-y-3">
+                <div class="flex gap-2">
+                    <select name="champion_id" id="champ-select"
+                            class="flex-1 bg-oracle-bg border border-oracle-border rounded px-3 py-2 text-oracle-light
+                                   focus:border-oracle-gold focus:outline-none text-sm">
+                        <option value="">Loading champions...</option>
+                    </select>
+                    <select name="role"
+                            class="w-32 bg-oracle-bg border border-oracle-border rounded px-3 py-2 text-oracle-light
+                                   focus:border-oracle-gold focus:outline-none text-sm">
+                        <option value="TOP">Top</option>
+                        <option value="JUNGLE">Jungle</option>
+                        <option value="MID" selected>Mid</option>
+                        <option value="ADC">ADC</option>
+                        <option value="SUPPORT">Support</option>
+                    </select>
+                </div>
+                <div>
+                    <input type="text" name="enemy_ids" placeholder="Enemy champ IDs (e.g., 86,238,64,222,412)"
+                           class="w-full bg-oracle-bg border border-oracle-border rounded px-3 py-2 text-oracle-light
+                                  placeholder-oracle-text/50 focus:border-oracle-gold focus:outline-none text-sm">
+                    <p class="text-oracle-text/50 text-xs mt-1">Leave empty for general build</p>
+                </div>
+                <button type="submit"
+                        class="w-full bg-oracle-blue/20 border border-oracle-blue text-oracle-blue px-4 py-2 rounded
+                               hover:bg-oracle-blue/30 transition-colors text-sm font-medium">
+                    Get Build
+                </button>
+            </form>
+            <div id="build-loading" class="htmx-indicator mt-4 text-oracle-text text-sm">
+                Loading recommendation...
+            </div>
+            <div id="build-result" class="mt-4"></div>
+        </div>
+    </div>
+
+    <!-- Pipeline stats -->
+    <div class="bg-oracle-card border border-oracle-border rounded-lg p-6"
+         hx-get="/api/stats" hx-trigger="load" hx-target="#stats-content">
+        <h2 class="text-oracle-light font-semibold mb-4">Pipeline Stats</h2>
+        <div id="stats-content" class="text-oracle-text text-sm">Loading...</div>
+    </div>
+</div>
+
+<script>
+    // Load champion list into dropdown
+    fetch('/api/champions')
+        .then(r => r.json())
+        .then(champs => {
+            const sel = document.getElementById('champ-select');
+            sel.innerHTML = '<option value="">Select Champion</option>';
+            champs.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.textContent = c.name;
+                sel.appendChild(opt);
+            });
+        });
+
+    // Poll game state every 3 seconds — auto-redirect to in-game when game starts
+    function updateGameState() {
+        fetch('/api/game-state')
+            .then(r => r.json())
+            .then(state => {
+                if (state.phase === 'in_game') {
+                    let s = {};
+                    try { s = JSON.parse(localStorage.getItem('oraclegg_settings')) || {}; } catch {}
+                    if (s.auto_redirect !== false) {
+                        window.location.href = '/in-game';
+                        return;
+                    }
+                }
+                const phaseText = document.getElementById('game-phase-text');
+                const phaseDetail = document.getElementById('game-phase-detail');
+                const phaseCard = document.getElementById('game-phase-card');
+
+                if (state.phase === 'in_game') {
+                    const mins = Math.floor(state.game_time / 60);
+                    const secs = Math.floor(state.game_time % 60);
+                    phaseText.textContent = 'IN GAME';
+                    phaseText.className = 'text-3xl font-bold mt-1 text-oracle-green';
+                    phaseDetail.textContent = `${mins}:${secs.toString().padStart(2, '0')} | ${state.players.length} players`;
+                    phaseCard.className = 'bg-oracle-card border border-oracle-green/50 rounded-lg p-6 glow';
+                } else if (state.phase === 'post_game') {
+                    phaseText.textContent = 'POST GAME';
+                    phaseText.className = 'text-3xl font-bold mt-1 text-oracle-gold';
+                    phaseDetail.textContent = 'Game ended';
+                } else {
+                    phaseText.textContent = 'IDLE';
+                    phaseText.className = 'text-3xl font-bold mt-1 text-oracle-blue';
+                    phaseDetail.textContent = 'Waiting for game...';
+                    phaseCard.className = 'bg-oracle-card border border-oracle-border rounded-lg p-6';
+                }
+            })
+            .catch(() => {});
+    }
+    updateGameState();
+    setInterval(updateGameState, 3000);
+
+    // Format stats JSON into readable HTML
+    document.body.addEventListener('htmx:afterSwap', function(e) {
+        if (e.detail.target.id === 'stats-content') {
+            try {
+                const data = JSON.parse(e.detail.target.textContent);
+                let html = `
+                    <div class="grid grid-cols-3 gap-4 mb-4">
+                        <div><span class="text-oracle-light text-lg font-bold">${data.aggregates}</span> builds</div>
+                        <div><span class="text-oracle-light text-lg font-bold">${data.champions}</span> champions</div>
+                        <div><span class="text-oracle-light text-lg font-bold">${data.items}</span> items</div>
+                    </div>
+                `;
+                if (data.top_champions && data.top_champions.length) {
+                    html += '<h3 class="text-oracle-light text-sm font-medium mb-2">Top Champions by Data</h3>';
+                    html += '<div class="space-y-1">';
+                    data.top_champions.forEach(c => {
+                        html += `<div class="flex justify-between text-xs">
+                            <span class="text-oracle-light">${c.champion}</span>
+                            <span>${c.total_games} games / ${c.builds} builds</span>
+                        </div>`;
+                    });
+                    html += '</div>';
+                }
+                e.detail.target.innerHTML = html;
+            } catch(err) {}
+        }
+    });
+</script>
+{% endblock %}

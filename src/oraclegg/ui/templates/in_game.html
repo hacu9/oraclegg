@@ -1,0 +1,401 @@
+{% extends "base.html" %}
+{% block title %}OracleGG - In Game{% endblock %}
+{% block nav_in_game %}text-oracle-gold{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <!-- Game header -->
+    <div class="flex items-center justify-between">
+        <h1 class="text-oracle-light text-2xl font-bold">In-Game Coach</h1>
+        <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2">
+                <div class="w-2 h-2 rounded-full" id="status-dot"></div>
+                <span class="text-sm" id="game-status">Checking...</span>
+            </div>
+            <div class="text-oracle-gold font-mono text-lg" id="game-timer">--:--</div>
+        </div>
+    </div>
+
+    <!-- Your stats bar -->
+    <div class="bg-oracle-card border border-oracle-border rounded-lg p-4" id="your-stats" style="display:none">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <img id="your-champ-icon" class="w-12 h-12 rounded-lg border-2 border-oracle-gold/50" src="" alt="">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-oracle-light font-bold text-lg" id="your-champ">-</span>
+                        <span class="text-oracle-text/50 text-sm" id="your-name">-</span>
+                    </div>
+                    <div class="flex items-center gap-3 mt-0.5">
+                        <span class="text-oracle-light font-mono text-xl font-bold" id="your-kda">0/0/0</span>
+                        <span class="text-sm font-mono" id="your-kda-ratio">0.0 KDA</span>
+                        <span class="text-oracle-text/60 text-sm" id="your-cs">0 CS</span>
+                        <span class="text-oracle-text/40 text-sm" id="your-csmin">(0.0/min)</span>
+                        <span class="text-oracle-text/40 text-sm" id="your-ward">0 wards</span>
+                    </div>
+                </div>
+            </div>
+            <div class="text-right">
+                <div class="text-oracle-gold font-mono text-lg" id="your-gold">0g</div>
+                <div class="text-xs mt-1" id="gold-diff">-</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tips feed -->
+    <div class="bg-oracle-card border border-oracle-gold/30 rounded-lg p-4 glow" id="tips-container" style="display:none">
+        <h2 class="text-oracle-gold font-semibold text-sm uppercase tracking-wider mb-3">Coach Tips</h2>
+        <div class="space-y-2" id="tips-feed"></div>
+    </div>
+
+    <!-- Teams -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="teams-container" style="display:none">
+        <!-- Allied team -->
+        <div class="bg-oracle-card border border-oracle-border rounded-lg p-4">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-oracle-blue font-semibold text-sm uppercase tracking-wider">Your Team</h2>
+                <span class="text-oracle-blue text-xs font-mono" id="ally-score">0/0/0</span>
+            </div>
+            <div class="space-y-0.5" id="ally-team"></div>
+        </div>
+
+        <!-- Enemy team -->
+        <div class="bg-oracle-card border border-oracle-red/30 rounded-lg p-4">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-oracle-red font-semibold text-sm uppercase tracking-wider">Enemy Team</h2>
+                <span class="text-oracle-red text-xs font-mono" id="enemy-score">0/0/0</span>
+            </div>
+            <div class="space-y-0.5" id="enemy-team"></div>
+        </div>
+    </div>
+
+    <!-- Boots + Dragon analysis -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="analysis-row" style="display:none">
+        <!-- Boots recommendation -->
+        <div class="bg-oracle-card border border-oracle-border rounded-lg p-4">
+            <h2 class="text-oracle-gold font-semibold text-sm uppercase tracking-wider mb-3">Boot Recommendation</h2>
+            <div id="boots-rec" class="text-oracle-text text-sm">Analyzing...</div>
+        </div>
+
+        <!-- Dragon value (auto-detected) -->
+        <div class="bg-oracle-card border border-oracle-border rounded-lg p-4">
+            <h2 class="text-oracle-gold font-semibold text-sm uppercase tracking-wider mb-3">
+                Dragon Analysis
+                <span class="text-oracle-text/40 text-[10px] ml-1 font-normal" id="dragon-info"></span>
+            </h2>
+            <div id="dragon-result" class="text-oracle-text text-sm">Waiting for dragon spawn...</div>
+        </div>
+    </div>
+
+    <!-- Waiting state -->
+    <div class="bg-oracle-card border border-oracle-border rounded-lg p-12 text-center" id="waiting-state">
+        <div class="text-oracle-text text-lg mb-2">Waiting for game...</div>
+        <p class="text-oracle-text/60 text-sm">This page auto-updates when a game is detected.</p>
+    </div>
+</div>
+
+<script>
+const DDRAGON = 'https://ddragon.leagueoflegends.com/cdn/16.6.1/img';
+function champIcon(name) { return `${DDRAGON}/champion/${name}.png`; }
+function itemIcon(id) { return `${DDRAGON}/item/${id}.png`; }
+
+function formatTime(secs) {
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return m + ':' + s.toString().padStart(2, '0');
+}
+
+function kdaRatio(k, d, a) {
+    return ((k + a) / Math.max(d, 1)).toFixed(1);
+}
+
+function kdaColor(ratio) {
+    if (ratio >= 5) return 'text-oracle-green';
+    if (ratio >= 3) return 'text-oracle-gold';
+    if (ratio >= 2) return 'text-oracle-light';
+    return 'text-oracle-red';
+}
+
+function renderPlayer(p, isEnemy, gameTime) {
+    const s = p.scores;
+    const kda = `${s.kills}/${s.deaths}/${s.assists}`;
+    const ratio = kdaRatio(s.kills, s.deaths, s.assists);
+    const cs = s.creepScore;
+    const csMin = gameTime > 60 ? (cs / (gameTime / 60)).toFixed(1) : '0.0';
+    const ward = Math.round(s.wardScore || 0);
+    const items = p.items.filter(i => i.itemID > 0 && ![3340, 3363, 3364, 2055, 2031, 2003].includes(i.itemID));
+    const isDead = p.isDead;
+
+    let badges = '';
+    if (isEnemy) {
+        if (s.kills >= 10 && s.deaths <= 3)
+            badges += '<span class="bg-oracle-red/30 text-oracle-red text-[9px] px-1 py-0.5 rounded-full animate-pulse font-bold">THREAT</span>';
+        else if (s.kills >= 6 && s.deaths <= 3)
+            badges += '<span class="bg-oracle-red/20 text-oracle-red text-[9px] px-1 py-0.5 rounded-full">FED</span>';
+    }
+    if (isDead) {
+        const respawn = p.respawnTimer ? Math.ceil(p.respawnTimer) : '';
+        const color = isEnemy ? 'oracle-green' : 'oracle-red';
+        badges += `<span class="bg-${color}/20 text-${color} text-[9px] px-1 py-0.5 rounded-full">DEAD${respawn ? ' ' + respawn + 's' : ''}</span>`;
+    }
+
+    return `
+        <div class="${isDead ? 'opacity-40' : ''} rounded-lg px-2 py-1.5 ${isEnemy ? 'hover:bg-oracle-red/5' : 'hover:bg-oracle-blue/5'} transition-colors">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2 min-w-0">
+                    <img src="${champIcon(p.championIcon || p.champion)}" class="w-7 h-7 rounded border border-oracle-border" alt="" onerror="this.style.display='none'">
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-1">
+                            <span class="text-oracle-light text-sm font-medium">${p.champion}</span>
+                            ${badges}
+                        </div>
+                        <span class="text-oracle-text/30 text-[10px]">${p.name}</span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 shrink-0 text-right">
+                    <span class="${kdaColor(ratio)} text-sm font-mono font-bold">${kda}</span>
+                    <span class="${kdaColor(ratio)} text-[10px] font-mono w-10">${ratio} KDA</span>
+                    <span class="text-oracle-text/50 text-[10px] w-12">${cs}cs (${csMin})</span>
+                    <span class="text-oracle-text/30 text-[10px] w-6">Lv${p.level}</span>
+                    <span class="text-oracle-text/20 text-[10px] w-6" title="Ward score">${ward}w</span>
+                </div>
+            </div>
+            <div class="flex gap-0.5 mt-1 ml-9">
+                ${items.map(i => `<img src="${itemIcon(i.itemID)}" class="w-5 h-5 rounded border border-oracle-border/40" title="${i.displayName}" alt="" onerror="this.style.display='none'">`).join('')}
+            </div>
+        </div>
+    `;
+}
+
+function updateUI(state) {
+    const dot = document.getElementById('status-dot');
+    const status = document.getElementById('game-status');
+    const timer = document.getElementById('game-timer');
+    const waiting = document.getElementById('waiting-state');
+    const yourStats = document.getElementById('your-stats');
+    const teams = document.getElementById('teams-container');
+    const tipsContainer = document.getElementById('tips-container');
+
+    if (state.phase !== 'in_game') {
+        dot.className = 'w-2 h-2 rounded-full bg-oracle-text';
+        status.textContent = state.phase === 'post_game' ? 'Game ended' : 'No active game';
+        status.className = 'text-sm text-oracle-text';
+        timer.textContent = '--:--';
+        waiting.style.display = 'block';
+        yourStats.style.display = 'none';
+        teams.style.display = 'none';
+        tipsContainer.style.display = 'none';
+        return;
+    }
+
+    dot.className = 'w-2 h-2 rounded-full bg-oracle-green animate-pulse';
+    status.textContent = 'LIVE';
+    status.className = 'text-sm text-oracle-green font-bold';
+    timer.textContent = formatTime(state.game_time);
+    waiting.style.display = 'none';
+    yourStats.style.display = 'block';
+    teams.style.display = 'grid';
+
+    const you = state.players.find(p => p.name === (state.active_player?.name || ''));
+    const yourTeam = you ? you.team : '';
+    const allies = state.players.filter(p => p.team === yourTeam);
+    const enemies = state.players.filter(p => p.team !== yourTeam);
+
+    // Your stats
+    if (you) {
+        const s = you.scores;
+        const ratio = kdaRatio(s.kills, s.deaths, s.assists);
+        const csMin = state.game_time > 60 ? (s.creepScore / (state.game_time / 60)).toFixed(1) : '0.0';
+
+        document.getElementById('your-champ-icon').src = champIcon(you.championIcon || you.champion);
+        document.getElementById('your-champ').textContent = you.champion;
+        document.getElementById('your-name').textContent = you.name;
+        document.getElementById('your-kda').textContent = `${s.kills}/${s.deaths}/${s.assists}`;
+        document.getElementById('your-kda-ratio').textContent = `${ratio} KDA`;
+        document.getElementById('your-kda-ratio').className = `text-sm font-mono ${kdaColor(ratio)}`;
+        document.getElementById('your-cs').textContent = `${s.creepScore} CS`;
+        document.getElementById('your-csmin').textContent = `(${csMin}/min)`;
+        document.getElementById('your-ward').textContent = `${Math.round(s.wardScore || 0)} wards`;
+        document.getElementById('your-gold').textContent = Math.floor(state.active_player?.gold || 0) + 'g';
+    }
+
+    // Team kill totals
+    const allyK = allies.reduce((a, p) => a + p.scores.kills, 0);
+    const allyD = allies.reduce((a, p) => a + p.scores.deaths, 0);
+    const allyA = allies.reduce((a, p) => a + p.scores.assists, 0);
+    const enemyK = enemies.reduce((a, p) => a + p.scores.kills, 0);
+    const enemyD = enemies.reduce((a, p) => a + p.scores.deaths, 0);
+    const enemyA = enemies.reduce((a, p) => a + p.scores.assists, 0);
+
+    document.getElementById('ally-score').textContent = `${allyK}/${allyD}/${allyA}`;
+    document.getElementById('enemy-score').textContent = `${enemyK}/${enemyD}/${enemyA}`;
+
+    // Gold diff (approximate from kills — real gold requires more data)
+    const killDiff = allyK - enemyK;
+    const goldDiffEl = document.getElementById('gold-diff');
+    if (killDiff > 0) {
+        goldDiffEl.textContent = `+${killDiff} kill lead`;
+        goldDiffEl.className = 'text-xs mt-1 text-oracle-green';
+    } else if (killDiff < 0) {
+        goldDiffEl.textContent = `${killDiff} kill deficit`;
+        goldDiffEl.className = 'text-xs mt-1 text-oracle-red';
+    } else {
+        goldDiffEl.textContent = 'Even in kills';
+        goldDiffEl.className = 'text-xs mt-1 text-oracle-text/40';
+    }
+
+    // Render teams
+    document.getElementById('ally-team').innerHTML = allies.map(p => renderPlayer(p, false, state.game_time)).join('');
+    document.getElementById('enemy-team').innerHTML = enemies.map(p => renderPlayer(p, true, state.game_time)).join('');
+
+    // Show analysis row and cache team data
+    document.getElementById('analysis-row').style.display = 'grid';
+    cachedAllies = allies;
+    cachedEnemies = enemies;
+    loadBoots(you, allies, enemies);
+
+    // Auto-load dragon analysis
+    const nextDragon = state.next_dragon || 'Unknown';
+    const terrain = state.map_terrain || 'Default';
+    const dragonsCount = state.dragons_taken || 0;
+    const dragonInfo = document.getElementById('dragon-info');
+
+    if (terrain !== 'Default') {
+        dragonInfo.textContent = `Rift: ${terrain} | ${dragonsCount} taken`;
+    } else {
+        dragonInfo.textContent = dragonsCount > 0 ? `${dragonsCount} taken` : '';
+    }
+
+    // Auto-evaluate when dragon type is known and changes
+    if (nextDragon !== 'Unknown' && nextDragon !== lastDragonType) {
+        lastDragonType = nextDragon;
+        evalDragon(nextDragon);
+    } else if (terrain !== 'Default' && lastDragonType === null) {
+        lastDragonType = terrain;
+        evalDragon(terrain);
+    }
+
+    // Tips — only re-render when new tips arrive (prevents flicker)
+    const tipsFeed = document.getElementById('tips-feed');
+    const allTips = state.all_tips || [];
+    const newVersion = state.tip_version || 0;
+
+    if (allTips.length > 0) {
+        tipsContainer.style.display = 'block';
+
+        if (newVersion !== lastTipVersion) {
+            lastTipVersion = newVersion;
+
+            // Client-side filter from settings
+            let tipSettings = {};
+            try { tipSettings = JSON.parse(localStorage.getItem('oraclegg_settings')) || {}; } catch {}
+            const enabledCats = tipSettings.categories || {};
+            const filteredTips = allTips.filter(t => enabledCats[t.category] !== false);
+
+            const colors = {
+                0: { bg: 'bg-oracle-red/10', border: 'border-oracle-red/40', text: 'text-oracle-red', label: 'URGENT' },
+                1: { bg: 'bg-oracle-gold/10', border: 'border-oracle-gold/40', text: 'text-oracle-gold', label: 'TIP' },
+                2: { bg: 'bg-oracle-blue/10', border: 'border-oracle-blue/40', text: 'text-oracle-blue', label: 'INFO' },
+            };
+            const recent = filteredTips.slice(-10).reverse();
+            tipsFeed.innerHTML = recent.map(tip => {
+                const c = colors[tip.priority] || colors[2];
+                const mins = Math.floor(tip.time / 60);
+                const secs = Math.floor(tip.time % 60);
+                const timeStr = mins + ':' + secs.toString().padStart(2, '0');
+                return `
+                    <div class="${c.bg} ${c.border} border-l-4 rounded-r-lg px-3 py-2 fade-in" data-tip-id="${tip.id}">
+                        <div class="flex items-start gap-2">
+                            <span class="${c.text} text-xs font-bold mt-0.5">${c.label}</span>
+                            <div class="flex-1">
+                                <div class="text-oracle-light text-sm">${tip.message}</div>
+                                <div class="text-oracle-text/30 text-[10px] mt-0.5">${timeStr} · ${tip.category}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    } else {
+        tipsContainer.style.display = 'none';
+    }
+}
+
+let lastTipVersion = -1;
+let bootsLoaded = false;
+let cachedAllies = [];
+let cachedEnemies = [];
+let lastDragonType = null;
+
+async function loadBoots(you, allies, enemies) {
+    if (bootsLoaded || !you) return;
+    const enemyNames = enemies.map(e => e.champion).join(',');
+    if (!enemyNames) return;
+
+    try {
+        const r = await fetch(`/api/boots?champion=${encodeURIComponent(you.champion)}&role=MID&enemies=${encodeURIComponent(enemyNames)}`);
+        const d = await r.json();
+        const div = document.getElementById('boots-rec');
+        const icon = itemIcon(d.boot_id);
+        let html = `
+            <div class="flex items-center gap-3 mb-2">
+                <img src="${icon}" class="w-8 h-8 rounded border border-oracle-gold/50" onerror="this.style.display='none'">
+                <span class="text-oracle-light font-bold">${d.boot_name}</span>
+            </div>
+            <div class="space-y-1">
+                ${d.reasons.map(r => `<div class="text-oracle-text/80 text-xs pl-2 border-l-2 border-oracle-gold/30">${r}</div>`).join('')}
+            </div>
+        `;
+        if (d.alternatives.length) {
+            html += `<div class="mt-2 text-oracle-text/40 text-[10px]">Alt: ${d.alternatives.map(a => a.name).join(', ')}</div>`;
+        }
+        html += `<div class="mt-2 text-oracle-text/30 text-[10px]">Enemy: ${d.enemy_breakdown.ap_threats} AP / ${d.enemy_breakdown.ad_threats} AD / ${d.enemy_breakdown.cc_count} CC / ${d.enemy_breakdown.auto_attackers} Auto</div>`;
+        div.innerHTML = html;
+        bootsLoaded = true;
+    } catch(e) {}
+}
+
+async function evalDragon(type) {
+    const allyNames = cachedAllies.map(a => a.champion).join(',');
+    const enemyNames = cachedEnemies.map(e => e.champion).join(',');
+    if (!allyNames || !enemyNames) return;
+
+    const div = document.getElementById('dragon-result');
+    div.innerHTML = 'Analyzing...';
+
+    try {
+        const r = await fetch(`/api/dragon?dragon_type=${type}&allies=${encodeURIComponent(allyNames)}&enemies=${encodeURIComponent(enemyNames)}`);
+        const d = await r.json();
+
+        const prioColors = { high: 'text-oracle-green', medium: 'text-oracle-gold', low: 'text-oracle-red' };
+        let html = `
+            <div class="mb-2">
+                <span class="text-oracle-light font-bold">${d.type} Dragon</span>
+                <span class="${prioColors[d.priority] || 'text-oracle-text'} text-xs ml-2 uppercase font-bold">${d.priority} priority</span>
+            </div>
+            <div class="text-oracle-text/60 text-xs mb-2">
+                Buff: ${d.buff} | Soul: ${d.soul}
+            </div>
+            <div class="text-oracle-light text-sm mb-2">${d.contest}</div>
+            <div class="space-y-1">
+                ${d.reasons.map(r => `<div class="text-oracle-text/80 text-xs pl-2 border-l-2 border-oracle-blue/30">${r}</div>`).join('')}
+            </div>
+            <div class="mt-2 text-oracle-text/30 text-[10px]">Value: Your team ${d.ally_value}/5 vs Enemy ${d.enemy_value}/5</div>
+        `;
+        div.innerHTML = html;
+    } catch(e) {
+        div.innerHTML = 'Error loading dragon analysis';
+    }
+}
+
+function poll() {
+    fetch('/api/game-state')
+        .then(r => r.json())
+        .then(updateUI)
+        .catch(() => {});
+}
+
+poll();
+setInterval(poll, 3000);
+</script>
+{% endblock %}

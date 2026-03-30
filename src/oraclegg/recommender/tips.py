@@ -178,6 +178,7 @@ class TipEngine:
             if kills >= 10 and deaths <= 3:
                 key = f"superfed_{champ}"
                 if key not in self._game_tips_given:
+                    self._game_tips_given.add(key)
                     tips.append(Tip(
                         priority=0,
                         category="threat",
@@ -189,6 +190,7 @@ class TipEngine:
                 if champ in HEALING_CHAMPS:
                     key = f"healing_threat_{champ}"
                     if key not in self._game_tips_given:
+                        self._game_tips_given.add(key)
                         # Check if team has anti-heal
                         team_has_antiheal = False
                         for ally in allies:
@@ -352,22 +354,25 @@ class TipEngine:
         key = "matchup_kb"
         if key in self._game_tips_given:
             return []
-        self._game_tips_given.add(key)
 
         from oraclegg.recommender.matchup_kb import get_matchup_tips
         my_champ = me.get("championName", "")
         tips = []
         for enemy in enemies:
-            e_champ = enemy.get("championName", "")
-            matchup_tips = get_matchup_tips(my_champ, e_champ)
-            if matchup_tips:
-                # Only show the first tip per enemy to avoid spam
-                tips.append(Tip(
-                    priority=1,
-                    category="strategy",
-                    message=f"vs {e_champ}: {matchup_tips[0]}",
-                ))
-        return tips[:3]  # Max 3 matchup tips
+            try:
+                e_champ = enemy.get("championName", "")
+                matchup_tips = get_matchup_tips(my_champ, e_champ)
+                if matchup_tips:
+                    tips.append(Tip(
+                        priority=1,
+                        category="strategy",
+                        message=f"vs {e_champ}: {matchup_tips[0]}",
+                    ))
+            except Exception:
+                pass
+
+        self._game_tips_given.add(key)  # Mark after loop completes
+        return tips[:3]
 
     def _check_dragon(self, allies: list, enemies: list, game_state: dict) -> list[Tip]:
         """Auto-evaluate dragon when rift transforms."""

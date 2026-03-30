@@ -731,7 +731,8 @@ function renderDashboard(state) {
         let html = soloLanes.map(renderLane).join('');
         if (botEnemy.length >= 2) {
             // Bot lane: show both champs per side with shared rating
-            const botRating = botEnemy[0].rating; // Use ADC matchup rating for the pair
+            const adcMatch = botEnemy.find(b => b.role === 'ADC');
+            const botRating = (adcMatch || botEnemy[0]).rating;
             const bs = RATING_STYLES[botRating] || RATING_STYLES['EVEN'];
             html += `<div class="flex items-center justify-between py-1.5 px-2 rounded hover:bg-oracle-border/10 transition-colors">
                 <div class="flex items-center gap-1 w-28">

@@ -28,7 +28,7 @@ _SKILL_MAX_ORDER = {
     "Sett": "Q>W>E", "Shen": "Q>E>W", "Singed": "Q>E>W", "Teemo": "Q>E>W",
     "Tryndamere": "Q>E>W", "Urgot": "W>Q>E", "Volibear": "Q>W>E", "Yorick": "Q>E>W",
     # Jungle
-    "Amumu": "W>Q>E", "BelVeth": "Q>E>W", "Briar": "Q>W>E", "Diana": "Q>W>E",
+    "Amumu": "W>Q>E", "Belveth": "Q>E>W", "Briar": "Q>W>E", "Diana": "Q>W>E",
     "Ekko": "Q>E>W", "Elise": "Q>W>E", "Evelynn": "Q>E>W", "Graves": "Q>E>W",
     "Hecarim": "Q>W>E", "JarvanIV": "Q>E>W", "Karthus": "Q>E>W", "Kayn": "Q>W>E",
     "Khazix": "Q>W>E", "Kindred": "Q>W>E", "LeeSin": "Q>W>E", "Lillia": "Q>W>E",
@@ -58,6 +58,27 @@ _SKILL_MAX_ORDER = {
     "Pyke": "Q>E>W", "Rakan": "W>Q>E", "Rell": "W>E>Q", "Senna": "Q>W>E",
     "Seraphine": "Q>W>E", "Sona": "Q>W>E", "Soraka": "W>Q>E", "Thresh": "E>Q>W",
     "Yuumi": "E>Q>W", "Zyra": "Q>E>W",
+}
+
+# Matchup-aware skill max overrides: (champion_key, enemy_archetype) -> order
+# When the default skill order changes based on enemy comp
+_SKILL_MAX_MATCHUP = {
+    # Annie: W max vs heavy tank (more AoE), Q max otherwise
+    ("Annie", "heavy_tank"): "W>Q>E",
+    ("Annie", "heavy_ad"): "Q>W>E",
+    # Riven: E max second vs poke for shield uptime
+    ("Riven", "poke"): "Q>E>W",
+    # Malphite: E max vs heavy AD (AS slow), Q max vs AP
+    ("Malphite", "heavy_ad"): "E>Q>W",
+    ("Malphite", "heavy_ap"): "Q>E>W",
+    # Viego: W max second vs tanky comps (stun duration), E otherwise
+    ("Viego", "heavy_tank"): "Q>W>E",
+    # Kayle: Q max vs poke for range harass
+    ("Kayle", "poke"): "Q>E>W",
+    # Jax: E max second vs heavy AD (dodge uptime)
+    ("Jax", "heavy_ad"): "W>E>Q",
+    # Warwick: W max vs scaling comps (chase potential)
+    ("Warwick", "scaling"): "Q>W>E",
 }
 
 # Completed item threshold (components are cheaper)
@@ -328,10 +349,14 @@ async def run_aggregation(min_sample_size: int = 30) -> dict:
             if not current_patch and data_list:
                 current_patch = data_list[-1].get("patch", "unknown")
 
-            # Skill max order — curated data for popular champs, heuristic fallback
+            # Skill max order — matchup-aware, then curated, then heuristic
             champ_info = champion_lookup.get(champ_id, {})
             champ_key = champ_info.get("key", "")
-            skill_max = _SKILL_MAX_ORDER.get(champ_key, "")
+
+            # Check matchup-aware overrides first (champ_key, archetype)
+            skill_max = _SKILL_MAX_MATCHUP.get((champ_key, archetype), "")
+            if not skill_max:
+                skill_max = _SKILL_MAX_ORDER.get(champ_key, "")
             if not skill_max:
                 champ_tags = champ_info.get("tags", [])
                 if isinstance(champ_tags, str):

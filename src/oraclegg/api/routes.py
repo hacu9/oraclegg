@@ -685,6 +685,7 @@ async def get_game_state():
     from oraclegg.game_loop.monitor import game_state
     return {
         "phase": game_state["phase"],
+        "lcu_phase": game_state.get("lcu_phase", ""),
         "game_time": round(game_state.get("game_time", 0), 1),
         "active_player": game_state.get("active_player"),
         "ddragon": settings.ddragon_base,

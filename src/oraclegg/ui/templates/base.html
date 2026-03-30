@@ -113,11 +113,12 @@
     function _globalStateCheck() {
         fetch('/api/game-state').then(r=>r.json()).then(s => {
             const phase = s.phase;
+            const lcuPhase = s.lcu_phase || '';
             const page = _getCurrentPage();
             const el = document.getElementById('live-indicator');
 
-            // Update live indicator
-            if (el) el.style.display = phase === 'in_game' ? 'flex' : 'none';
+            // Update live indicator for both in_game and champ_select
+            if (el) el.style.display = (phase === 'in_game' || lcuPhase === 'champ_select') ? 'flex' : 'none';
 
             // Check auto_redirect setting
             let autoRedirect = true;
@@ -133,6 +134,12 @@
             }
 
             if (autoRedirect) {
+                // Champ select detected → go to champ select page
+                if (lcuPhase === 'champ_select' && phase !== 'in_game' && page !== 'champ-select') {
+                    window.location.href = '/champ-select';
+                    return;
+                }
+
                 // Game started → go to in-game (from any page)
                 if (phase === 'in_game' && page !== 'in-game') {
                     window.location.href = '/in-game';

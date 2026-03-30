@@ -197,17 +197,23 @@
     </div>
 </div>
 
-<!-- Post-game state (auto-redirects to /tracking after 8s via base.html) -->
+<!-- Post-game state -->
 <div id="post-game-state" style="display:none">
     <div class="bg-oracle-card border border-oracle-border rounded-lg p-8 text-center space-y-4">
-        <div class="text-oracle-gold text-2xl font-bold" id="pg-result">Game Ended</div>
-        <div class="flex items-center justify-center gap-4" id="pg-summary"></div>
-        <p class="text-oracle-text/50 text-xs mt-2">Redirecting to match analysis...</p>
-        <div class="flex gap-3 justify-center mt-2">
-            <a href="/tracking" class="bg-oracle-gold/20 border border-oracle-gold text-oracle-gold px-6 py-2 rounded hover:bg-oracle-gold/30 transition-colors text-sm font-medium">
-                View Now
-            </a>
+        <div class="text-3xl font-bold" id="pg-result">Game Ended</div>
+        <div class="flex items-center justify-center gap-6" id="pg-stats">
+            <div id="pg-icon-wrap" style="display:none">
+                <img id="pg-icon" class="w-16 h-16 rounded-lg border-2 border-oracle-border mx-auto" src="" alt="">
+            </div>
+            <div class="text-left">
+                <div class="text-oracle-light font-mono text-2xl font-bold" id="pg-kda"></div>
+                <div class="text-oracle-text/60 text-sm" id="pg-details"></div>
+            </div>
         </div>
+        <p class="text-oracle-text/40 text-xs mt-2">Analyzing match and redirecting to tracking...</p>
+        <a href="/tracking" class="inline-block mt-2 bg-oracle-gold/20 border border-oracle-gold text-oracle-gold px-6 py-2 rounded hover:bg-oracle-gold/30 transition-colors text-sm font-medium">
+            View Analysis
+        </a>
     </div>
 </div>
 
@@ -917,20 +923,31 @@ async function evalDragon(type, state) {
 
 function showPostGame(state) {
     document.getElementById('game-active').style.display = 'none';
+    document.getElementById('game-classic').style.display = 'none';
+    document.getElementById('view-toggle').style.display = 'none';
     document.getElementById('waiting-state').style.display = 'none';
     document.getElementById('post-game-state').style.display = 'block';
+
     const result = state.post_game_result;
     if (result) {
         const winText = result.win ? 'VICTORY' : 'DEFEAT';
         const winColor = result.win ? 'text-oracle-green' : 'text-oracle-red';
-        document.getElementById('pg-result').className = `text-2xl font-bold ${winColor}`;
+        document.getElementById('pg-result').className = `text-3xl font-bold ${winColor}`;
         document.getElementById('pg-result').textContent = winText;
-        document.getElementById('pg-summary').innerHTML = `
-            <div class="text-center">
-                <div class="text-oracle-light font-bold text-lg">${result.champion || ''}</div>
-                <div class="text-oracle-text text-sm">${result.kda || ''}</div>
-            </div>
-        `;
+        document.getElementById('pg-kda').textContent = result.kda || '';
+
+        const details = [];
+        if (result.champion) details.push(result.champion);
+        if (result.cs_per_min) details.push(`${result.cs_per_min} CS/min`);
+        if (result.vision_score) details.push(`${result.vision_score} vision`);
+        if (result.game_duration_str) details.push(result.game_duration_str);
+        document.getElementById('pg-details').textContent = details.join(' · ');
+
+        if (result.champion) {
+            const iconKey = champIconKey(result.champion);
+            document.getElementById('pg-icon').src = champIcon(iconKey);
+            document.getElementById('pg-icon-wrap').style.display = 'block';
+        }
     }
 }
 

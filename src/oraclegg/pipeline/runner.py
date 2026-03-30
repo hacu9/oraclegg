@@ -135,3 +135,79 @@ async def auto_pipeline_if_needed():
 
     logger.info("Pipeline: no builds found, auto-running pipeline...")
     trigger_pipeline(max_players=50, min_sample=5)
+
+    # Also auto-import match history if summoner is configured
+    if settings.summoner_configured:
+        asyncio.create_task(_auto_import_history())
+
+
+async def _auto_import_history():
+    """Import recent match history for the configured summoner."""
+    await asyncio.sleep(5)  # Let pipeline start first
+    try:
+        from oraclegg.db.models import PersonalMatch
+        async with async_session() as session:
+            count = (await session.execute(
+                select(func.count()).select_from(PersonalMatch)
+            )).scalar()
+
+        if count > 0:
+            logger.info(f"Match history: {count} matches already imported")
+            return
+
+        logger.info("Match history: importing recent ranked games...")
+        from oraclegg.riot.client import RiotClient
+        from oraclegg.tracker.post_game import analyze_post_game
+
+        client = RiotClient()
+        name, tag = settings.summoner_riot_id.split("#")
+        account = await client.get_account_by_riot_id(name, tag)
+        match_ids = await client.get_match_ids(account.puuid, queue=420, count=20)
+
+        imported = 0
+        for mid in match_ids:
+            try:
+                match = await client.get_match(mid)
+                info = match.info
+                me = next((p for p in info.participants if p.puuid == account.puuid), None)
+                if not me:
+                    continue
+
+                import json
+                from datetime import datetime
+                from oraclegg.db.models import PersonalMatch as PM
+
+                async with async_session() as session:
+                    existing = await session.execute(select(PM).where(PM.match_id == mid))
+                    if existing.scalar_one_or_none():
+                        continue
+
+                cs = me.totalMinionsKilled + me.neutralMinionsKilled
+                game_mins = info.gameDuration / 60
+                role = {"MIDDLE": "MID", "BOTTOM": "ADC", "UTILITY": "SUPPORT"}.get(me.teamPosition, me.teamPosition or "UNKNOWN")
+                items = [getattr(me, f"item{i}") for i in range(7) if getattr(me, f"item{i}", 0) > 0]
+                enemy_ids = [p.championId for p in info.participants if p.teamId != me.teamId]
+
+                pm = PM(
+                    match_id=mid, champion_id=me.championId, role=role, win=me.win,
+                    kills=me.kills, deaths=me.deaths, assists=me.assists,
+                    cs=cs, cs_per_min=round(cs / max(game_mins, 1), 1),
+                    vision_score=me.visionScore,
+                    damage_dealt=me.totalDamageDealtToChampions,
+                    damage_taken=me.totalDamageTaken, gold_earned=me.goldEarned,
+                    game_duration=info.gameDuration, items_final=json.dumps(items),
+                    enemy_champion_ids=json.dumps(enemy_ids),
+                    played_at=datetime.fromtimestamp(info.gameCreation / 1000),
+                    patch=info.gameVersion[:8],
+                )
+                async with async_session() as session:
+                    await session.merge(pm)
+                    await session.commit()
+                imported += 1
+            except Exception:
+                pass
+
+        await client.close()
+        logger.info(f"Match history: imported {imported} matches")
+    except Exception as e:
+        logger.error(f"Match history import failed: {e}")

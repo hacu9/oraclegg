@@ -3,229 +3,228 @@
 {% block nav_champ_select %}text-oracle-gold{% endblock %}
 
 {% block content %}
-<div class="space-y-6">
+<div class="space-y-4">
     <div class="flex items-center justify-between">
-        <h1 class="text-oracle-light text-2xl font-bold">Champ Select</h1>
-        <div class="text-oracle-text text-sm" id="phase-status">
-            Waiting for game...
+        <div class="flex items-center gap-3">
+            <h1 class="text-oracle-light text-2xl font-bold">Champ Select</h1>
+            <span id="live-badge" style="display:none" class="bg-oracle-green/20 text-oracle-green text-xs px-2 py-1 rounded-full border border-oracle-green/30 animate-pulse">LIVE</span>
+        </div>
+        <div class="text-oracle-text text-sm" id="phase-status">Waiting for champ select...</div>
+    </div>
+
+    <!-- Auto-scouting results (shown when LCU detects champ select) -->
+    <div id="auto-scout" style="display:none">
+        <!-- Your pick + enemy comp -->
+        <div class="bg-oracle-card border border-oracle-border rounded-lg p-4 mb-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <img id="as-your-icon" class="w-12 h-12 rounded-lg border-2 border-oracle-gold/50" src="" alt="" style="display:none">
+                    <div>
+                        <span class="text-oracle-light font-bold text-lg" id="as-your-champ">Picking...</span>
+                        <span class="text-oracle-text/40 text-sm ml-2" id="as-your-role"></span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2" id="as-comp-tags"></div>
+            </div>
+        </div>
+
+        <!-- Enemy scouting cards -->
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4" id="as-enemy-cards">
+            <div class="col-span-5 text-oracle-text/50 text-sm text-center py-4">Scouting enemies...</div>
+        </div>
+
+        <!-- Build + comp analysis -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-oracle-card border border-oracle-border rounded-lg p-4">
+                <h2 class="text-oracle-light font-semibold mb-3">Enemy Comp Analysis</h2>
+                <div id="as-comp-result" class="text-oracle-text text-sm">Analyzing...</div>
+            </div>
+            <div class="bg-oracle-card border border-oracle-border rounded-lg p-4">
+                <h2 class="text-oracle-light font-semibold mb-3">Recommended Build</h2>
+                <div id="as-build-result" class="text-oracle-text text-sm">Loading...</div>
+            </div>
         </div>
     </div>
 
-    <!-- Manual input (for testing without LCU) -->
-    <div class="bg-oracle-card border border-oracle-border rounded-lg p-6">
-        <h2 class="text-oracle-light font-semibold mb-4">Manual Matchup Builder</h2>
-        <form id="matchup-form" class="space-y-4">
-            <!-- Your champion -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                    <label class="text-oracle-text text-xs uppercase tracking-wider block mb-1">Your Champion</label>
-                    <select id="your-champ" class="w-full bg-oracle-bg border border-oracle-border rounded px-3 py-2
-                                text-oracle-light focus:border-oracle-gold focus:outline-none text-sm">
-                        <option value="">Select...</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="text-oracle-text text-xs uppercase tracking-wider block mb-1">Your Role</label>
-                    <select id="your-role" class="w-full bg-oracle-bg border border-oracle-border rounded px-3 py-2
-                                text-oracle-light focus:border-oracle-gold focus:outline-none text-sm">
-                        <option value="TOP">Top</option>
-                        <option value="JUNGLE">Jungle</option>
-                        <option value="MID" selected>Mid</option>
-                        <option value="ADC">ADC</option>
-                        <option value="SUPPORT">Support</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- Enemy team -->
-            <div>
-                <label class="text-oracle-text text-xs uppercase tracking-wider block mb-2">Enemy Team</label>
-                <div class="grid grid-cols-5 gap-2">
-                    <select class="enemy-champ bg-oracle-bg border border-oracle-border rounded px-2 py-2
-                                text-oracle-light focus:border-oracle-red focus:outline-none text-xs">
-                        <option value="">Top</option>
-                    </select>
-                    <select class="enemy-champ bg-oracle-bg border border-oracle-border rounded px-2 py-2
-                                text-oracle-light focus:border-oracle-red focus:outline-none text-xs">
-                        <option value="">Jungle</option>
-                    </select>
-                    <select class="enemy-champ bg-oracle-bg border border-oracle-border rounded px-2 py-2
-                                text-oracle-light focus:border-oracle-red focus:outline-none text-xs">
-                        <option value="">Mid</option>
-                    </select>
-                    <select class="enemy-champ bg-oracle-bg border border-oracle-border rounded px-2 py-2
-                                text-oracle-light focus:border-oracle-red focus:outline-none text-xs">
-                        <option value="">ADC</option>
-                    </select>
-                    <select class="enemy-champ bg-oracle-bg border border-oracle-border rounded px-2 py-2
-                                text-oracle-light focus:border-oracle-red focus:outline-none text-xs">
-                        <option value="">Support</option>
-                    </select>
-                </div>
-            </div>
-
-            <button type="submit"
-                    class="w-full bg-oracle-gold/20 border border-oracle-gold text-oracle-gold px-4 py-3 rounded
-                           hover:bg-oracle-gold/30 transition-colors text-sm font-medium">
-                Analyze Matchup
-            </button>
-        </form>
-    </div>
-
-    <!-- Results -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <!-- Comp analysis -->
-        <div class="bg-oracle-card border border-oracle-border rounded-lg p-6">
-            <h2 class="text-oracle-light font-semibold mb-4">Enemy Comp Analysis</h2>
-            <div id="comp-result" class="text-oracle-text text-sm">
-                Select enemy champions to analyze their composition.
-            </div>
-        </div>
-
-        <!-- Build recommendation -->
-        <div class="bg-oracle-card border border-oracle-border rounded-lg p-6">
-            <h2 class="text-oracle-light font-semibold mb-4">Recommended Build</h2>
-            <div id="build-result" class="text-oracle-text text-sm">
-                Select your champion and enemy team for a build recommendation.
-            </div>
-        </div>
+    <!-- Waiting state -->
+    <div id="cs-waiting" class="bg-oracle-card border border-oracle-border rounded-lg p-12 text-center">
+        <div class="text-oracle-text text-lg mb-2">Waiting for champ select...</div>
+        <p class="text-oracle-text/60 text-sm">Enter a game lobby and this page will automatically scout all enemies.</p>
+        <p class="text-oracle-text/40 text-xs mt-4">Make sure the League client is running.</p>
     </div>
 </div>
 
 <script>
-    // Auto-redirect handled by base.html global state machine
+const DDRAGON = 'https://ddragon.leagueoflegends.com/cdn/16.6.1/img';
+const CHAMP_ICON_MAP = {
+    'Wukong': 'MonkeyKing', "Kai'Sa": 'Kaisa', "Kha'Zix": 'Khazix',
+    "Bel'Veth": 'Belveth', "Vel'Koz": 'Velkoz', "Kog'Maw": 'KogMaw',
+    "Cho'Gath": 'Chogath', "Rek'Sai": 'RekSai', "K'Sante": 'KSante',
+    "Renata Glasc": 'Renata', "Nunu & Willump": 'Nunu', "LeBlanc": 'Leblanc',
+    "Aurelion Sol": 'AurelionSol', "Dr. Mundo": 'DrMundo', "Jarvan IV": 'JarvanIV',
+    "Lee Sin": 'LeeSin', "Master Yi": 'MasterYi', "Miss Fortune": 'MissFortune',
+    "Tahm Kench": 'TahmKench', "Twisted Fate": 'TwistedFate', "Xin Zhao": 'XinZhao',
+};
+function champIconKey(n) { return CHAMP_ICON_MAP[n] || n; }
+function champIcon(n) { return `${DDRAGON}/champion/${champIconKey(n)}.png`; }
 
-    let champions = [];
-    let champById = {};
-    let liveSelectActive = false;
+let champMap = {};  // id -> {name, key}
+let lastEnemyIds = '';
+let scoutedEnemies = {};
 
-    // Poll for live champ select data from LCU
-    async function pollChampSelect() {
-        try {
-            const r = await fetch('/api/champ-select/live');
-            const d = await r.json();
-            if (d.active && d.data && !liveSelectActive) {
-                liveSelectActive = true;
-                // Parse LCU champ select data to extract picks
-                const actions = d.data.actions || [];
-                const myTeam = d.data.myTeam || [];
-                const theirTeam = d.data.theirTeam || [];
+// Load champion data
+fetch('/api/champions').then(r => r.json()).then(champs => {
+    champs.forEach(c => { champMap[c.id] = c; });
+});
 
-                // Auto-fill enemy picks
-                const enemySelects = document.querySelectorAll('.enemy-champ');
-                theirTeam.forEach((p, i) => {
-                    if (p.championId && enemySelects[i]) {
-                        enemySelects[i].value = p.championId;
-                    }
-                });
+// Poll for live champ select
+async function pollCS() {
+    try {
+        const r = await fetch('/api/champ-select/live');
+        const d = await r.json();
 
-                // Auto-fill your pick
-                const localPlayer = myTeam.find(p => p.cellId === d.data.localPlayerCellId);
-                if (localPlayer && localPlayer.championId) {
-                    document.getElementById('your-champ').value = localPlayer.championId;
-                }
-
-                // Show indicator
-                const heading = document.querySelector('h1');
-                if (heading && !document.getElementById('live-cs-badge')) {
-                    heading.insertAdjacentHTML('afterend',
-                        '<span id="live-cs-badge" class="ml-3 bg-oracle-green/20 text-oracle-green text-xs px-2 py-1 rounded-full border border-oracle-green/30 animate-pulse">LIVE</span>'
-                    );
-                }
-            } else if (!d.active) {
-                liveSelectActive = false;
-            }
-        } catch {}
-    }
-    setInterval(pollChampSelect, 2000);
-    pollChampSelect();
-
-    // Load champions
-    fetch('/api/champions')
-        .then(r => r.json())
-        .then(champs => {
-            champions = champs;
-            const yourChamp = document.getElementById('your-champ');
-            const enemySelects = document.querySelectorAll('.enemy-champ');
-
-            function populateSelect(sel, placeholder) {
-                const firstOpt = sel.options[0];
-                sel.innerHTML = '';
-                const opt = document.createElement('option');
-                opt.value = '';
-                opt.textContent = firstOpt ? firstOpt.textContent : 'Select...';
-                sel.appendChild(opt);
-                champs.forEach(c => {
-                    const o = document.createElement('option');
-                    o.value = c.id;
-                    o.textContent = c.name;
-                    sel.appendChild(o);
-                });
-            }
-
-            populateSelect(yourChamp, 'Your Champion');
-            enemySelects.forEach(sel => populateSelect(sel));
-        });
-
-    // Handle form submit
-    document.getElementById('matchup-form').addEventListener('submit', async function(e) {
-        e.preventDefault();
-
-        const champId = document.getElementById('your-champ').value;
-        const role = document.getElementById('your-role').value;
-        const enemyIds = Array.from(document.querySelectorAll('.enemy-champ'))
-            .map(s => s.value)
-            .filter(v => v);
-
-        if (!champId) {
-            alert('Select your champion');
+        if (!d.active) {
+            document.getElementById('auto-scout').style.display = 'none';
+            document.getElementById('cs-waiting').style.display = 'block';
+            document.getElementById('live-badge').style.display = 'none';
+            document.getElementById('phase-status').textContent = 'Waiting for champ select...';
+            lastEnemyIds = '';
+            scoutedEnemies = {};
             return;
         }
 
-        // Show loading state
-        const btn = document.querySelector('#matchup-form button[type="submit"]');
-        btn.disabled = true; btn.textContent = 'Analyzing...';
-        document.getElementById('comp-result').innerHTML = '<span class="text-oracle-text/50">Analyzing...</span>';
-        document.getElementById('build-result').innerHTML = '<span class="text-oracle-text/50">Loading...</span>';
+        document.getElementById('auto-scout').style.display = 'block';
+        document.getElementById('cs-waiting').style.display = 'none';
+        document.getElementById('live-badge').style.display = 'inline-flex';
+        document.getElementById('phase-status').textContent = 'Live — scouting enemies';
+
+        const myTeam = d.data.myTeam || [];
+        const theirTeam = d.data.theirTeam || [];
+        const localCell = d.data.localPlayerCellId;
+
+        // Your pick
+        const me = myTeam.find(p => p.cellId === localCell);
+        if (me && me.championId && champMap[me.championId]) {
+            const c = champMap[me.championId];
+            document.getElementById('as-your-champ').textContent = c.name;
+            const icon = document.getElementById('as-your-icon');
+            icon.src = champIcon(c.key || c.name);
+            icon.style.display = 'block';
+        }
+
+        // Enemy picks — scout when they change
+        const enemyIds = theirTeam.map(p => p.championId).filter(Boolean).sort().join(',');
+        if (enemyIds && enemyIds !== lastEnemyIds) {
+            lastEnemyIds = enemyIds;
+            await scoutEnemies(theirTeam);
+            await analyzeComp(theirTeam, me);
+        }
+
+    } catch(e) {}
+}
+
+async function scoutEnemies(theirTeam) {
+    const cardsDiv = document.getElementById('as-enemy-cards');
+    let html = '';
+
+    for (const enemy of theirTeam) {
+        if (!enemy.championId) continue;
+        const champ = champMap[enemy.championId];
+        const champName = champ ? champ.name : `Champ ${enemy.championId}`;
+        const champKey = champ ? (champ.key || champ.name) : '';
+
+        // Show placeholder card immediately
+        html += `<div class="bg-oracle-card border border-oracle-border rounded-lg p-3" id="scout-card-${enemy.championId}">
+            <div class="flex items-center gap-2 mb-2">
+                <img src="${champIcon(champKey)}" class="w-8 h-8 rounded border border-oracle-border" onerror="this.style.display='none'">
+                <span class="text-oracle-light text-sm font-bold">${champName}</span>
+            </div>
+            <div class="text-oracle-text/40 text-xs animate-pulse">Scouting...</div>
+        </div>`;
+    }
+    cardsDiv.innerHTML = html;
+
+    // Scout each enemy via API (they have summoner names from LCU)
+    for (const enemy of theirTeam) {
+        if (!enemy.championId || !enemy.summonerId) continue;
+        const champ = champMap[enemy.championId];
+        const champName = champ ? champ.name : '';
+        const champKey = champ ? (champ.key || champ.name) : '';
 
         try {
-        // Classify comp
-        if (enemyIds.length > 0) {
-            const compResp = await fetch(`/api/comp/classify?champion_ids=${enemyIds.join(',')}`);
-            const compData = await compResp.json();
-            const compDiv = document.getElementById('comp-result');
-            let html = '<div class="space-y-2">';
-            html += '<div class="flex flex-wrap gap-1.5">';
-            compData.archetypes.forEach(a => {
-                const colors = {
-                    'heavy_ap': 'purple', 'heavy_ad': 'red', 'heavy_tank': 'blue',
-                    'balanced': 'gold', 'poke': 'green', 'engage': 'red',
-                    'split_push': 'gold', 'protect_carry': 'blue', 'assassin': 'purple',
-                    'early_game': 'red', 'scaling': 'blue',
-                };
-                const color = colors[a] || 'gold';
-                html += `<span class="bg-oracle-${color}/20 text-oracle-${color} text-xs px-2 py-1 rounded-full border border-oracle-${color}/30">
-                    ${a.replace('_', ' ').toUpperCase()}
-                </span>`;
-            });
-            html += '</div></div>';
-            compDiv.innerHTML = html;
-        }
+            // LCU gives us summonerId, we need to look them up
+            // For now use the scout endpoint with their name if available
+            const nameTag = enemy.nameVisibilityType === 'HIDDEN' ? null : null; // LCU may not expose name
 
-        // Get build
-        const params = new URLSearchParams({
-            champion_id: champId,
-            role: role,
-            enemy_ids: enemyIds.join(','),
-        });
-        const buildResp = await fetch(`/api/recommend/html?${params}`);
-        document.getElementById('build-result').innerHTML = await buildResp.text();
+            // Build a card with what we know from LCU
+            const card = document.getElementById(`scout-card-${enemy.championId}`);
+            if (card) {
+                let cardHtml = `
+                    <div class="flex items-center gap-2 mb-2">
+                        <img src="${champIcon(champKey)}" class="w-8 h-8 rounded border border-oracle-border" onerror="this.style.display='none'">
+                        <span class="text-oracle-light text-sm font-bold">${champName}</span>
+                    </div>`;
+
+                // Add assigned position if available
+                if (enemy.assignedPosition) {
+                    const roleMap = { 'top': 'TOP', 'jungle': 'JGL', 'middle': 'MID', 'bottom': 'ADC', 'utility': 'SUP' };
+                    cardHtml += `<div class="text-oracle-text/50 text-[10px] mb-1">${roleMap[enemy.assignedPosition] || enemy.assignedPosition}</div>`;
+                }
+
+                cardHtml += `<div class="text-oracle-text/40 text-[10px]">Champion locked</div>`;
+                card.innerHTML = cardHtml;
+            }
+        } catch(e) {}
+    }
+}
+
+async function analyzeComp(theirTeam, me) {
+    const enemyIds = theirTeam.map(p => p.championId).filter(Boolean);
+    if (enemyIds.length === 0) return;
+
+    // Comp tags
+    try {
+        const compResp = await fetch(`/api/comp/classify?champion_ids=${enemyIds.join(',')}`);
+        const compData = await compResp.json();
+
+        // Tags in header
+        const colors = {
+            'heavy_ap': 'purple', 'heavy_ad': 'red', 'heavy_tank': 'blue',
+            'balanced': 'gold', 'poke': 'green', 'engage': 'red',
+            'split_push': 'gold', 'protect_carry': 'blue', 'assassin': 'purple',
+            'early_game': 'red', 'scaling': 'blue',
+        };
+        document.getElementById('as-comp-tags').innerHTML = compData.archetypes.map(a => {
+            const c = colors[a] || 'gold';
+            return `<span class="bg-oracle-${c}/20 text-oracle-${c} text-xs px-2 py-1 rounded-full border border-oracle-${c}/30">${a.replace('_', ' ').toUpperCase()}</span>`;
+        }).join('');
+
+        // Comp analysis detail
+        document.getElementById('as-comp-result').innerHTML = compData.archetypes.map(a => {
+            const c = colors[a] || 'gold';
+            return `<span class="bg-oracle-${c}/20 text-oracle-${c} text-xs px-2 py-1 rounded-full border border-oracle-${c}/30">${a.replace('_', ' ').toUpperCase()}</span>`;
+        }).join(' ');
+    } catch(e) {
+        document.getElementById('as-comp-result').innerHTML = '<span class="text-oracle-red text-sm">Failed to analyze comp</span>';
+    }
+
+    // Build recommendation
+    if (me && me.championId) {
+        try {
+            const params = new URLSearchParams({
+                champion_id: me.championId,
+                role: me.assignedPosition === 'middle' ? 'MID' : me.assignedPosition === 'bottom' ? 'ADC' : me.assignedPosition === 'utility' ? 'SUPPORT' : (me.assignedPosition || 'MID').toUpperCase(),
+                enemy_ids: enemyIds.join(','),
+            });
+            const buildResp = await fetch(`/api/recommend/html?${params}`);
+            document.getElementById('as-build-result').innerHTML = await buildResp.text();
         } catch(e) {
-            document.getElementById('build-result').innerHTML =
-                '<span class="text-oracle-red text-sm">Failed to load. Check your connection.</span>';
-        } finally {
-            btn.disabled = false; btn.textContent = 'Analyze Matchup';
+            document.getElementById('as-build-result').innerHTML = '<span class="text-oracle-red text-sm">Failed to load build</span>';
         }
-    });
+    }
+}
+
+setInterval(pollCS, 2000);
+pollCS();
 </script>
 {% endblock %}

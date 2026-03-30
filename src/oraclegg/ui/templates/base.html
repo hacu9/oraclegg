@@ -139,13 +139,10 @@
                     return;
                 }
 
-                // Game ended → go to tracking after 8s (if we were in-game)
+                // Game ended → stay on in-game page to show post-game summary
+                // User clicks "View Analysis" when ready
                 if (phase === 'post_game' && _lastPhase === 'in_game' && page === 'in-game') {
-                    if (!_postGameTimer) {
-                        _postGameTimer = setTimeout(() => {
-                            window.location.href = '/tracking';
-                        }, 8000);
-                    }
+                    // Don't redirect — post-game summary shows on the in-game page
                 }
 
                 // Back to idle after post-game (clear timer)

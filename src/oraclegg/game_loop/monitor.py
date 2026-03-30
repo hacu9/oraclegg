@@ -13,6 +13,7 @@ from datetime import datetime
 from sqlalchemy import select
 
 from oraclegg.config import settings
+from oraclegg.constants import CHAMP_ICON_MAP, ROLE_MAP, ROLE_ORDER
 from oraclegg.db.engine import async_session
 from oraclegg.db.models import Champion
 from oraclegg.recommender.tips import tip_engine
@@ -24,32 +25,8 @@ _tip_counter = 0
 _game_initialized = False
 _scouting_task: asyncio.Task | None = None
 
-# Map Live Client position names to standard role names
-POSITION_MAP = {
-    "TOP": "TOP",
-    "JUNGLE": "JUNGLE",
-    "MIDDLE": "MID",
-    "BOTTOM": "ADC",
-    "UTILITY": "SUPPORT",
-}
-
-ROLE_ORDER = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"]
-
-# Champions whose Live Client name differs from Data Dragon key
-CHAMP_ICON_MAP = {
-    "Wukong": "MonkeyKing",
-    "Renata Glasc": "Renata",
-    "Nunu & Willump": "Nunu",
-    "Kai'Sa": "Kaisa",
-    "Kha'Zix": "Khazix",
-    "Bel'Veth": "Belveth",
-    "Vel'Koz": "Velkoz",
-    "Kog'Maw": "KogMaw",
-    "Cho'Gath": "Chogath",
-    "Rek'Sai": "RekSai",
-    "K'Sante": "KSante",
-    "LeBlanc": "Leblanc",
-}
+# Alias for backward compatibility with code using POSITION_MAP
+POSITION_MAP = ROLE_MAP
 
 # Strategy advice per enemy comp archetype
 STRATEGY_TIPS = {

@@ -9,6 +9,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import select, func
 
 from oraclegg.config import settings
+from oraclegg.constants import CHAMP_ICON_MAP, spell_name
 from oraclegg.db.engine import async_session
 from oraclegg.db.models import BuildAggregate, Champion, Item
 from oraclegg.recommender.builds import recommend_build, recommend_for_matchup
@@ -20,21 +21,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Champions whose Live Client name differs from Data Dragon key
-CHAMP_ICON_MAP = {
-    "Wukong": "MonkeyKing",
-    "Renata Glasc": "Renata",
-    "Nunu & Willump": "Nunu",
-    "Kai'Sa": "Kaisa",
-    "Kha'Zix": "Khazix",
-    "Bel'Veth": "Belveth",
-    "Vel'Koz": "Velkoz",
-    "Kog'Maw": "KogMaw",
-    "Cho'Gath": "Chogath",
-    "Rek'Sai": "RekSai",
-    "K'Sante": "KSante",
-    "LeBlanc": "Leblanc",
-}
+
 
 router = APIRouter()
 _templates_dir = Path(__file__).parent.parent / "ui" / "templates"

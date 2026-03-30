@@ -117,7 +117,7 @@
         <div class="bg-oracle-card border border-oracle-border rounded-lg p-6 card-hover">
             <h2 class="text-oracle-light font-semibold mb-4">Scout a Player</h2>
             <form hx-get="/api/scout/html" hx-target="#scout-result" hx-indicator="#scout-loading"
-                  class="flex gap-2">
+                  hx-disabled-elt="find button" class="flex gap-2">
                 <input type="text" name="name" placeholder="Summoner Name"
                        class="flex-1 bg-oracle-bg border border-oracle-border rounded px-3 py-2 text-oracle-light
                               placeholder-oracle-text/50 focus:border-oracle-gold focus:outline-none text-sm">

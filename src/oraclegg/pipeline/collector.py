@@ -10,21 +10,12 @@ import logging
 from sqlalchemy import select
 
 from oraclegg.config import settings
+from oraclegg.constants import ROLE_MAP
 from oraclegg.db.engine import async_session
 from oraclegg.db.models import MatchHistoryCache
 from oraclegg.riot.client import RiotClient, RiotAPIError
 
 logger = logging.getLogger(__name__)
-
-# Role normalization: Riot uses MIDDLE/BOTTOM/UTILITY, we use MID/ADC/SUPPORT
-ROLE_MAP = {
-    "TOP": "TOP",
-    "JUNGLE": "JUNGLE",
-    "MIDDLE": "MID",
-    "BOTTOM": "ADC",
-    "UTILITY": "SUPPORT",
-    "": "UNKNOWN",
-}
 
 
 async def collect_high_elo_puuids(

@@ -139,6 +139,13 @@
             return;
         }
 
+        // Show loading state
+        const btn = document.querySelector('#matchup-form button[type="submit"]');
+        btn.disabled = true; btn.textContent = 'Analyzing...';
+        document.getElementById('comp-result').innerHTML = '<span class="text-oracle-text/50">Analyzing...</span>';
+        document.getElementById('build-result').innerHTML = '<span class="text-oracle-text/50">Loading...</span>';
+
+        try {
         // Classify comp
         if (enemyIds.length > 0) {
             const compResp = await fetch(`/api/comp/classify?champion_ids=${enemyIds.join(',')}`);
@@ -170,6 +177,12 @@
         });
         const buildResp = await fetch(`/api/recommend/html?${params}`);
         document.getElementById('build-result').innerHTML = await buildResp.text();
+        } catch(e) {
+            document.getElementById('build-result').innerHTML =
+                '<span class="text-oracle-red text-sm">Failed to load. Check your connection.</span>';
+        } finally {
+            btn.disabled = false; btn.textContent = 'Analyze Matchup';
+        }
     });
 </script>
 {% endblock %}

@@ -119,7 +119,7 @@ class TipEngine:
         # Filter out already-given one-time tips
         filtered = []
         for t in tips:
-            key = f"{t.category}:{t.message[:50]}"
+            key = f"{t.category}:{hash(t.message)}"
             if key not in self._game_tips_given:
                 filtered.append(t)
                 self._game_tips_given.add(key)

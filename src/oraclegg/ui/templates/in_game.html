@@ -237,16 +237,23 @@ function renderDashboard(state) {
         ).join('');
     }
 
-    // SKILL ORDER section
+    // SKILL ORDER section — hide if no data from pipeline
     if (state.build_rec) {
-        let html = '';
-        if (state.build_rec.skill_max_order) {
-            html += `<div class="text-oracle-light font-bold text-lg mb-1">${state.build_rec.skill_max_order}</div>`;
+        const hasSkillOrder = state.build_rec.skill_max_order ||
+            (state.build_rec.skill_order && state.build_rec.skill_order.length > 0);
+        const skillCard = document.getElementById('skill-content').closest('.col-span-3');
+        if (hasSkillOrder) {
+            let html = '';
+            if (state.build_rec.skill_max_order) {
+                html += `<div class="text-oracle-light font-bold text-lg mb-1">${state.build_rec.skill_max_order}</div>`;
+            }
+            if (state.build_rec.skill_order && state.build_rec.skill_order.length > 0) {
+                html += '<div class="text-oracle-text/60 text-xs">Level 1: ' + state.build_rec.skill_order[0] + '</div>';
+            }
+            document.getElementById('skill-content').innerHTML = html;
+        } else if (skillCard) {
+            skillCard.style.display = 'none';
         }
-        if (state.build_rec.skill_order && state.build_rec.skill_order.length > 0) {
-            html += '<div class="text-oracle-text/60 text-xs">Level 1: ' + state.build_rec.skill_order[0] + '</div>';
-        }
-        if (html) document.getElementById('skill-content').innerHTML = html;
     }
 
     // SCOUTING STATUS badge

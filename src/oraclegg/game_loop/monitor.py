@@ -627,6 +627,21 @@ async def _initialize_game(data: dict):
         except Exception as e:
             logger.error(f"Build recommendation error: {e}")
 
+    # Override boots with live analysis (pipeline boots can be wrong for the matchup)
+    enemy_champ_names = [p.get("championName", "") for p in enemies if p.get("championName")]
+    if build_rec and enemy_champ_names:
+        try:
+            from oraclegg.recommender.rules.boots_rules import recommend_boots
+            boot_rec = recommend_boots(your_champ, your_position, enemy_champ_names, {})
+            if boot_rec.get("boot_id"):
+                build_rec["boots"] = {
+                    "id": boot_rec["boot_id"],
+                    "name": boot_rec["boot_name"],
+                }
+                build_rec["boots_reason"] = boot_rec["reasons"][0] if boot_rec["reasons"] else ""
+        except Exception:
+            pass
+
     # Generate strategy from primary archetype
     strategy = ""
     for arch in archetypes:

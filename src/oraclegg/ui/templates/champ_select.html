@@ -28,9 +28,18 @@
             </div>
         </div>
 
-        <!-- Enemy scouting cards -->
-        <div class="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4" id="as-enemy-cards">
-            <div class="col-span-5 text-oracle-text/50 text-sm text-center py-4">Scouting enemies...</div>
+        <!-- Both teams -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <!-- Your team -->
+            <div>
+                <h3 class="text-oracle-blue text-xs uppercase tracking-wider font-semibold mb-2">Your Team</h3>
+                <div class="flex gap-2" id="as-ally-cards"></div>
+            </div>
+            <!-- Enemy team -->
+            <div>
+                <h3 class="text-oracle-red text-xs uppercase tracking-wider font-semibold mb-2">Enemy Team</h3>
+                <div class="flex gap-2" id="as-enemy-cards"></div>
+            </div>
         </div>
 
         <!-- Build + comp analysis -->
@@ -116,11 +125,28 @@ async function pollCS() {
         const enemyIds = theirTeam.map(p => p.championId).filter(Boolean).sort().join(',');
         if (enemyIds && enemyIds !== lastEnemyIds) {
             lastEnemyIds = enemyIds;
+            renderAllies(myTeam);
             await scoutEnemies(theirTeam);
             await analyzeComp(theirTeam, me);
         }
 
     } catch(e) {}
+}
+
+function renderAllies(myTeam) {
+    const cardsDiv = document.getElementById('as-ally-cards');
+    const roleMap = { 'top': 'TOP', 'jungle': 'JGL', 'middle': 'MID', 'bottom': 'ADC', 'utility': 'SUP' };
+    cardsDiv.innerHTML = myTeam.filter(p => p.championId).map(p => {
+        const champ = champMap[p.championId];
+        const name = champ ? champ.name : `Champ ${p.championId}`;
+        const key = champ ? (champ.key || champ.name) : '';
+        const role = roleMap[p.assignedPosition] || '';
+        return `<div class="bg-oracle-card border border-oracle-blue/30 rounded-lg p-2 flex flex-col items-center gap-1 w-16">
+            <img src="${champIcon(key)}" class="w-10 h-10 rounded border border-oracle-border" onerror="this.style.display='none'">
+            <span class="text-oracle-light text-[10px] font-bold text-center truncate w-full">${name}</span>
+            ${role ? `<span class="text-oracle-text/40 text-[9px]">${role}</span>` : ''}
+        </div>`;
+    }).join('');
 }
 
 async function scoutEnemies(theirTeam) {
@@ -134,12 +160,10 @@ async function scoutEnemies(theirTeam) {
         const champKey = champ ? (champ.key || champ.name) : '';
 
         // Show placeholder card immediately
-        html += `<div class="bg-oracle-card border border-oracle-border rounded-lg p-3" id="scout-card-${enemy.championId}">
-            <div class="flex items-center gap-2 mb-2">
-                <img src="${champIcon(champKey)}" class="w-8 h-8 rounded border border-oracle-border" onerror="this.style.display='none'">
-                <span class="text-oracle-light text-sm font-bold">${champName}</span>
-            </div>
-            <div class="text-oracle-text/40 text-xs animate-pulse">Scouting...</div>
+        html += `<div class="bg-oracle-card border border-oracle-red/30 rounded-lg p-2 flex flex-col items-center gap-1 w-16" id="scout-card-${enemy.championId}">
+            <img src="${champIcon(champKey)}" class="w-10 h-10 rounded border border-oracle-border" onerror="this.style.display='none'">
+            <span class="text-oracle-light text-[10px] font-bold text-center truncate w-full">${champName}</span>
+            <span class="text-oracle-text/30 text-[9px] animate-pulse">...</span>
         </div>`;
     }
     cardsDiv.innerHTML = html;

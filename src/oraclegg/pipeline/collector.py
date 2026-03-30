@@ -18,6 +18,35 @@ from oraclegg.riot.client import RiotClient, RiotAPIError
 logger = logging.getLogger(__name__)
 
 
+SKILL_SLOT_MAP = {1: "Q", 2: "W", 3: "E", 4: "R"}
+
+
+def _merge_skill_order(match_data, timeline_data):
+    """Extract skill level-up order from timeline and add to participant data."""
+    try:
+        frames = timeline_data.get("info", {}).get("frames", [])
+        # Build participant_id -> skill order list
+        skill_orders = {}  # participantId -> ["Q", "W", "E", "Q", ...]
+        for frame in frames:
+            for event in frame.get("events", []):
+                if event.get("type") == "SKILL_LEVEL_UP":
+                    pid = event.get("participantId", 0)
+                    skill = SKILL_SLOT_MAP.get(event.get("skillSlot", 0), "")
+                    if skill and pid:
+                        if pid not in skill_orders:
+                            skill_orders[pid] = []
+                        skill_orders[pid].append(skill)
+
+        # Merge into match data participants
+        participants = match_data.info.participants
+        for i, p in enumerate(participants):
+            pid = i + 1  # participantId is 1-indexed
+            if pid in skill_orders:
+                p.skillOrder = skill_orders[pid]
+    except Exception:
+        pass
+
+
 async def collect_high_elo_puuids(
     client: RiotClient,
     platform: str | None = None,
@@ -126,6 +155,18 @@ async def fetch_and_cache_matches(
     for i, match_id in enumerate(to_fetch):
         try:
             match_data = await client.get_match(match_id)
+
+            # Also fetch timeline for skill order data
+            timeline_data = None
+            try:
+                timeline_data = await client.get_match_timeline(match_id)
+            except RiotAPIError:
+                pass  # Timeline fetch is optional
+
+            # Merge timeline skill events into participant data
+            if timeline_data:
+                _merge_skill_order(match_data, timeline_data)
+
             async with async_session() as session:
                 cache_entry = MatchHistoryCache(
                     match_id=match_id,

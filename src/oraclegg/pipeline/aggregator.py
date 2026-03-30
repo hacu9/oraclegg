@@ -81,6 +81,56 @@ _SKILL_MAX_MATCHUP = {
     ("Warwick", "scaling"): "Q>W>E",
 }
 
+def _derive_skill_max(data_list: list[dict]) -> str:
+    """Derive skill max order from real timeline data across multiple games.
+
+    Looks at which skill (Q/W/E) reaches level 5 first across all games.
+    Returns e.g. "Q>E>W" or empty string if no data.
+    """
+    from collections import Counter
+    max_order_counter = Counter()
+
+    for d in data_list:
+        skill_order = d.get("skill_order", [])
+        if len(skill_order) < 9:  # Need at least 9 levels to determine max order
+            continue
+
+        # Count levels per skill at each point
+        counts = {"Q": 0, "W": 0, "E": 0}
+        first_maxed = []
+        for skill in skill_order:
+            if skill in counts:
+                counts[skill] += 1
+                if counts[skill] == 5 and skill not in first_maxed:
+                    first_maxed.append(skill)
+
+        if len(first_maxed) >= 2:
+            # Fill in the third if missing
+            remaining = [s for s in ["Q", "W", "E"] if s not in first_maxed]
+            order = first_maxed + remaining
+            max_order_counter[">".join(order[:3])] += (2 if d.get("win") else 1)
+
+    if max_order_counter:
+        return max_order_counter.most_common(1)[0][0]
+    return ""
+
+
+def _derive_best_skill_order(data_list: list[dict]) -> list[str]:
+    """Get the most common first 18 skill level-up sequence from real data."""
+    from collections import Counter
+    order_counter = Counter()
+
+    for d in data_list:
+        skill_order = d.get("skill_order", [])
+        if len(skill_order) >= 15:  # Need substantial data
+            key = tuple(skill_order[:18])
+            order_counter[key] += (2 if d.get("win") else 1)
+
+    if order_counter:
+        return list(order_counter.most_common(1)[0][0])
+    return []
+
+
 # Completed item threshold (components are cheaper)
 COMPLETED_ITEM_MIN_GOLD = 1800
 
@@ -171,6 +221,9 @@ def extract_participant_data(match_data: dict, participant: dict) -> dict | None
 
     stat_perks = perks.get("statPerks", {})
 
+    # Skill order from timeline (if available)
+    skill_order = participant.get("skillOrder", [])
+
     return {
         "champion_id": participant.get("championId"),
         "champion_name": participant.get("championName", ""),
@@ -179,6 +232,7 @@ def extract_participant_data(match_data: dict, participant: dict) -> dict | None
         "enemy_champion_ids": enemy_champs,
         "build_items": build_items,
         "boots_id": boots_id,
+        "skill_order": skill_order,
         "summoner_spells": [
             participant.get("summoner1Id", 0),
             participant.get("summoner2Id", 0),
@@ -349,12 +403,17 @@ async def run_aggregation(min_sample_size: int = 30) -> dict:
             if not current_patch and data_list:
                 current_patch = data_list[-1].get("patch", "unknown")
 
-            # Skill max order — matchup-aware, then curated, then heuristic
+            # Skill max order — from real data first, then curated, then heuristic
             champ_info = champion_lookup.get(champ_id, {})
             champ_key = champ_info.get("key", "")
 
-            # Check matchup-aware overrides first (champ_key, archetype)
-            skill_max = _SKILL_MAX_MATCHUP.get((champ_key, archetype), "")
+            # Try to derive from real timeline data
+            skill_max = _derive_skill_max(data_list)
+            best_skill_order = _derive_best_skill_order(data_list)
+
+            # Fallback: matchup-aware curated -> general curated -> heuristic
+            if not skill_max:
+                skill_max = _SKILL_MAX_MATCHUP.get((champ_key, archetype), "")
             if not skill_max:
                 skill_max = _SKILL_MAX_ORDER.get(champ_key, "")
             if not skill_max:
@@ -380,7 +439,7 @@ async def run_aggregation(min_sample_size: int = 30) -> dict:
                 win_rate=win_rate,
                 item_build_path=json.dumps(best_build),
                 boots_id=best_boots,
-                skill_order=json.dumps([]),
+                skill_order=json.dumps(best_skill_order),
                 skill_max_order=skill_max,
                 starting_items=json.dumps([]),
                 summoner_spells=json.dumps(best_spells),

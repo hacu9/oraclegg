@@ -6,8 +6,8 @@
 <!-- View toggle -->
 <div id="view-toggle" style="display:none" class="flex items-center justify-end mb-3 gap-2">
     <span class="text-oracle-text/40 text-xs">View:</span>
-    <button onclick="setView('coach')" id="btn-coach" class="text-xs px-3 py-1 rounded border border-oracle-gold text-oracle-gold bg-oracle-gold/20">Coach</button>
-    <button onclick="setView('classic')" id="btn-classic" class="text-xs px-3 py-1 rounded border border-oracle-border text-oracle-text">Classic</button>
+    <button onclick="setView('coach')" id="btn-coach" class="text-xs px-3 py-1 rounded border border-oracle-gold text-oracle-gold bg-oracle-gold/20">Full Coach</button>
+    <button onclick="setView('classic')" id="btn-classic" class="text-xs px-3 py-1 rounded border border-oracle-border text-oracle-text">Scoreboard + Coach</button>
 </div>
 
 <!-- Coach view (new layout) -->
@@ -124,53 +124,75 @@
     <!-- (tips moved to top of page) -->
 </div>
 
-<!-- Classic view (original scoreboard) -->
+<!-- Unified view (coaching + scoreboard merged) -->
 <div id="game-classic" style="display:none">
-    <div class="bg-oracle-card border border-oracle-border rounded-lg p-4 mb-3">
+
+    <!-- Tips at top -->
+    <div class="bg-oracle-card border border-oracle-gold/30 rounded-lg p-3 glow mb-3" id="cl-tips-section" style="display:none">
+        <div class="flex items-center justify-between mb-2">
+            <h2 class="text-oracle-gold font-semibold text-xs uppercase tracking-wider">Live Tips</h2>
+        </div>
+        <div class="space-y-1.5" id="cl-tips-feed"></div>
+    </div>
+
+    <!-- Your stats + build rec + timer -->
+    <div class="bg-oracle-card border border-oracle-border rounded-lg p-3 mb-3">
         <div class="flex items-center justify-between">
-            <div class="flex items-center gap-4">
-                <img id="cl-champ-icon" class="w-12 h-12 rounded-lg border-2 border-oracle-gold/50" src="" alt="">
+            <div class="flex items-center gap-3">
+                <img id="cl-champ-icon" class="w-10 h-10 rounded-lg border-2 border-oracle-gold/50" src="" alt="">
                 <div>
                     <div class="flex items-center gap-2">
-                        <span class="text-oracle-light font-bold text-lg" id="cl-champ">-</span>
-                        <span class="text-oracle-text/50 text-sm" id="cl-name">-</span>
+                        <span class="text-oracle-light font-bold" id="cl-champ">-</span>
+                        <span class="text-oracle-text/40 text-xs" id="cl-name">-</span>
                     </div>
-                    <div class="flex items-center gap-3 mt-0.5">
-                        <span class="text-oracle-light font-mono text-xl font-bold" id="cl-kda">0/0/0</span>
-                        <span class="text-sm font-mono" id="cl-kda-ratio">0.0 KDA</span>
-                        <span class="text-oracle-text/60 text-sm" id="cl-cs">0 CS</span>
-                        <span class="text-oracle-text/40 text-sm" id="cl-csmin">(0.0/min)</span>
-                        <span class="text-oracle-text/40 text-sm" id="cl-ward">0 wards</span>
+                    <div class="flex items-center gap-2 mt-0.5">
+                        <span class="text-oracle-light font-mono text-lg font-bold" id="cl-kda">0/0/0</span>
+                        <span class="text-sm font-mono" id="cl-kda-ratio">0.0</span>
+                        <span class="text-oracle-text/50 text-xs" id="cl-cs">0 CS</span>
+                        <span class="text-oracle-text/30 text-xs" id="cl-csmin">(0/m)</span>
                     </div>
                 </div>
             </div>
-            <div class="text-right">
-                <div class="text-oracle-gold font-mono text-lg" id="cl-gold">0g</div>
-                <div class="text-oracle-gold font-mono text-sm" id="cl-timer">0:00</div>
+            <div class="flex items-center gap-4">
+                <!-- Build rec (compact) -->
+                <div id="cl-build-rec" class="flex items-center gap-1"></div>
+                <div class="text-right">
+                    <div class="text-oracle-gold font-mono text-lg" id="cl-timer">0:00</div>
+                    <div class="text-oracle-text/40 text-xs" id="cl-gold">0g</div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Tips in classic view -->
-    <div class="bg-oracle-card border border-oracle-gold/30 rounded-lg p-4 glow mb-3" id="cl-tips-section" style="display:none">
-        <h2 class="text-oracle-gold font-semibold text-sm uppercase tracking-wider mb-3">Coach Tips</h2>
-        <div class="space-y-2" id="cl-tips-feed"></div>
+    <!-- Lane matchups (compact bar view) + win conditions -->
+    <div class="grid grid-cols-12 gap-3 mb-3" id="cl-coaching-row" style="display:none">
+        <!-- Matchups with bars -->
+        <div class="col-span-8 bg-oracle-card border border-oracle-border rounded-lg p-3">
+            <h2 class="text-oracle-text text-[10px] uppercase tracking-wider font-semibold mb-2">Lane Matchups</h2>
+            <div id="cl-lane-matchups" class="space-y-1"></div>
+        </div>
+        <!-- Win conditions (compact) -->
+        <div class="col-span-4 bg-oracle-card border border-oracle-border rounded-lg p-3">
+            <h2 class="text-oracle-text text-[10px] uppercase tracking-wider font-semibold mb-2">Win Conditions</h2>
+            <div id="cl-win-condition" class="space-y-1.5"></div>
+        </div>
     </div>
 
+    <!-- Scoreboard -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div class="bg-oracle-card border border-oracle-border rounded-lg p-4">
-            <div class="flex items-center justify-between mb-3">
-                <h2 class="text-oracle-blue font-semibold text-sm uppercase tracking-wider">Your Team</h2>
+        <div class="bg-oracle-card border border-oracle-border rounded-lg p-3">
+            <div class="flex items-center justify-between mb-2">
+                <h2 class="text-oracle-blue font-semibold text-xs uppercase tracking-wider">Your Team</h2>
                 <span class="text-oracle-blue text-xs font-mono" id="cl-ally-score">0/0/0</span>
             </div>
-            <div class="space-y-1" id="cl-ally-team"></div>
+            <div class="space-y-0.5" id="cl-ally-team"></div>
         </div>
-        <div class="bg-oracle-card border border-oracle-red/30 rounded-lg p-4">
-            <div class="flex items-center justify-between mb-3">
-                <h2 class="text-oracle-red font-semibold text-sm uppercase tracking-wider">Enemy Team</h2>
+        <div class="bg-oracle-card border border-oracle-red/30 rounded-lg p-3">
+            <div class="flex items-center justify-between mb-2">
+                <h2 class="text-oracle-red font-semibold text-xs uppercase tracking-wider">Enemy Team</h2>
                 <span class="text-oracle-red text-xs font-mono" id="cl-enemy-score">0/0/0</span>
             </div>
-            <div class="space-y-1" id="cl-enemy-team"></div>
+            <div class="space-y-0.5" id="cl-enemy-team"></div>
         </div>
     </div>
 </div>
@@ -283,6 +305,8 @@ function renderClassicPlayer(p, isEnemy, gameTime) {
         </div>`;
 }
 
+let _clCoachRendered = false;
+
 function updateClassicView(state) {
     const you = state.players.find(p => (p.name||p.riotIdGameName) === state.active_player?.name);
     if (!you) return;
@@ -293,19 +317,84 @@ function updateClassicView(state) {
     const ratio = ((s.kills||0)+(s.assists||0))/Math.max(s.deaths||1,1);
     const csMin = state.game_time > 60 ? ((s.creepScore||0)/(state.game_time/60)).toFixed(1) : '0.0';
 
+    // Your stats header
     document.getElementById('cl-champ-icon').src = champIcon(champIconKey(you.champion||you.championName||''));
     document.getElementById('cl-champ').textContent = you.champion||you.championName||'';
     document.getElementById('cl-name').textContent = you.name||you.riotIdGameName||'';
     document.getElementById('cl-kda').textContent = `${s.kills||0}/${s.deaths||0}/${s.assists||0}`;
     const ratioEl = document.getElementById('cl-kda-ratio');
-    ratioEl.textContent = `${ratio.toFixed(1)} KDA`;
+    ratioEl.textContent = `${ratio.toFixed(1)}`;
     ratioEl.className = `text-sm font-mono ${ratio>=4?'text-oracle-green':ratio>=2.5?'text-oracle-gold':'text-oracle-red'}`;
     document.getElementById('cl-cs').textContent = `${s.creepScore||0} CS`;
-    document.getElementById('cl-csmin').textContent = `(${csMin}/min)`;
-    document.getElementById('cl-ward').textContent = `${Math.round(s.wardScore||0)} wards`;
+    document.getElementById('cl-csmin').textContent = `(${csMin}/m)`;
     document.getElementById('cl-gold').textContent = Math.floor(state.active_player?.gold||0) + 'g';
     document.getElementById('cl-timer').textContent = formatTime(state.game_time);
 
+    // Build rec icons (compact row of item icons)
+    if (state.build_rec && state.build_rec.build_path && !_clCoachRendered) {
+        const buildDiv = document.getElementById('cl-build-rec');
+        let bhtml = state.build_rec.build_path.slice(0, 5).map(item =>
+            `<img src="${itemIcon(item.id)}" class="w-7 h-7 rounded border border-oracle-border/40" title="${item.name}" onerror="this.style.display='none'">`
+        ).join('');
+        if (state.build_rec.boots) {
+            bhtml += `<img src="${itemIcon(state.build_rec.boots.id)}" class="w-7 h-7 rounded border border-oracle-gold/40" title="${state.build_rec.boots.name}" onerror="this.style.display='none'">`;
+        }
+        buildDiv.innerHTML = bhtml;
+    }
+
+    // Coaching row (matchups + win conditions) — render once
+    if (!_clCoachRendered && (state.lane_matchups?.length > 0 || state.win_condition?.length > 0)) {
+        document.getElementById('cl-coaching-row').style.display = 'grid';
+
+        // Lane matchups with bars
+        if (state.lane_matchups?.length > 0) {
+            const lmDiv = document.getElementById('cl-lane-matchups');
+            lmDiv.innerHTML = state.lane_matchups.map(lm => {
+                const style = RATING_STYLES[lm.rating] || RATING_STYLES['EVEN'];
+                const es = lm.enemy_stats || {};
+                let tags = '';
+                if (es.first_timing) tags += '<span class="bg-oracle-purple/20 text-oracle-purple text-[8px] px-1 rounded-full border border-oracle-purple/30">1ST</span>';
+                if (es.tilted) tags += '<span class="bg-oracle-red/20 text-oracle-red text-[8px] px-1 rounded-full border border-oracle-red/30">TILT</span>';
+                if (es.one_trick) tags += '<span class="bg-oracle-gold/20 text-oracle-gold text-[8px] px-1 rounded-full border border-oracle-gold/30">OTP</span>';
+
+                return `<div class="flex items-center gap-2 py-0.5">
+                    <div class="flex items-center gap-1 w-20">
+                        <img src="${champIcon(lm.ally_icon)}" class="w-5 h-5 rounded" onerror="this.style.display='none'">
+                        <span class="text-oracle-light text-[11px] truncate">${lm.ally_champ}</span>
+                    </div>
+                    <div class="flex-1 h-1.5 bg-oracle-border/30 rounded-full overflow-hidden">
+                        <div class="h-full rounded-full ${style.pct >= 55 ? 'bg-oracle-green' : style.pct >= 45 ? 'bg-oracle-gold' : 'bg-oracle-red'}" style="width:${style.pct}%"></div>
+                    </div>
+                    <div class="flex items-center gap-1 w-24 justify-end">
+                        <span class="text-oracle-light text-[11px] truncate">${lm.enemy_champ}</span>
+                        ${tags}
+                        <img src="${champIcon(lm.enemy_icon)}" class="w-5 h-5 rounded" onerror="this.style.display='none'">
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        // Win conditions (compact)
+        if (state.win_condition?.length > 0) {
+            const wcStyles = {
+                'target': { color: 'text-oracle-green', bg: 'bg-oracle-green/10', icon: '>' },
+                'threat': { color: 'text-oracle-red', bg: 'bg-oracle-red/10', icon: '!' },
+                'carry': { color: 'text-oracle-blue', bg: 'bg-oracle-blue/10', icon: '*' },
+                'timing': { color: 'text-oracle-gold', bg: 'bg-oracle-gold/10', icon: '~' },
+            };
+            document.getElementById('cl-win-condition').innerHTML = state.win_condition.slice(0, 4).map(wc => {
+                const st = wcStyles[wc.type] || wcStyles['carry'];
+                return `<div class="${st.bg} rounded px-2 py-1.5">
+                    <div class="${st.color} text-[11px] font-bold">${wc.reason || wc.label || ''}</div>
+                    ${wc.detail ? `<div class="text-oracle-text/50 text-[9px] leading-tight mt-0.5">${wc.detail}</div>` : ''}
+                </div>`;
+            }).join('');
+        }
+
+        _clCoachRendered = true;
+    }
+
+    // Scoreboard
     const aK = allies.reduce((a,p) => a+(p.scores?.kills||0), 0);
     const aD = allies.reduce((a,p) => a+(p.scores?.deaths||0), 0);
     const aA = allies.reduce((a,p) => a+(p.scores?.assists||0), 0);
@@ -314,11 +403,10 @@ function updateClassicView(state) {
     const eA = enemies.reduce((a,p) => a+(p.scores?.assists||0), 0);
     document.getElementById('cl-ally-score').textContent = `${aK}/${aD}/${aA}`;
     document.getElementById('cl-enemy-score').textContent = `${eK}/${eD}/${eA}`;
-
     document.getElementById('cl-ally-team').innerHTML = allies.map(p => renderClassicPlayer(p, false, state.game_time)).join('');
     document.getElementById('cl-enemy-team').innerHTML = enemies.map(p => renderClassicPlayer(p, true, state.game_time)).join('');
 
-    // Tips in classic view (mirror from coach view)
+    // Tips
     const allTips = state.all_tips || [];
     const clTips = document.getElementById('cl-tips-section');
     const clFeed = document.getElementById('cl-tips-feed');
@@ -329,16 +417,16 @@ function updateClassicView(state) {
             1: { bg: 'bg-oracle-gold/10', border: 'border-oracle-gold/40', text: 'text-oracle-gold', label: 'TIP' },
             2: { bg: 'bg-oracle-blue/10', border: 'border-oracle-blue/40', text: 'text-oracle-blue', label: 'INFO' },
         };
-        clFeed.innerHTML = allTips.slice(-8).reverse().map(t => {
+        clFeed.innerHTML = allTips.slice(-6).reverse().map(t => {
             const c = colors[t.priority] || colors[2];
             const ts = Math.floor(t.time/60)+':'+Math.floor(t.time%60).toString().padStart(2,'0');
-            return `<div class="${c.bg} ${c.border} border-l-4 rounded-r-lg px-3 py-2">
+            return `<div class="${c.bg} ${c.border} border-l-4 rounded-r-lg px-2 py-1.5">
                 <div class="flex items-start gap-2">
-                    <span class="${c.text} text-xs font-bold mt-0.5">${c.label}</span>
+                    <span class="${c.text} text-[10px] font-bold mt-0.5">${c.label}</span>
                     <div class="flex-1">
-                        <div class="text-oracle-light text-sm">${t.message}</div>
-                        <div class="text-oracle-text/30 text-[10px] mt-0.5">${ts}</div>
+                        <div class="text-oracle-light text-xs">${t.message}</div>
                     </div>
+                    <span class="text-oracle-text/20 text-[9px] shrink-0">${ts}</span>
                 </div>
             </div>`;
         }).join('');
@@ -595,15 +683,20 @@ function renderDashboard(state) {
         function renderLane(lm) {
             const style = RATING_STYLES[lm.rating] || RATING_STYLES['EVEN'];
             const es = lm.enemy_stats || {};
-            let badges = '';
-            if (es.first_timing) badges += '<span class="bg-oracle-purple/20 text-oracle-purple text-[9px] px-1 py-0.5 rounded-full">1ST TIME</span>';
-            if (es.tilted) badges += '<span class="bg-oracle-red/20 text-oracle-red text-[9px] px-1 py-0.5 rounded-full">TILTED</span>';
-            if (es.one_trick) badges += '<span class="bg-oracle-gold/20 text-oracle-gold text-[9px] px-1 py-0.5 rounded-full">OTP</span>';
-            if (es.hot_streak) badges += '<span class="bg-oracle-green/20 text-oracle-green text-[9px] px-1 py-0.5 rounded-full">HOT</span>';
+
+            // Tags go on top of the enemy champion
+            let enemyTags = '';
+            if (es.first_timing) enemyTags += '<span class="bg-oracle-purple/20 text-oracle-purple text-[9px] px-1.5 py-0.5 rounded-full border border-oracle-purple/30 font-bold">1ST TIME</span>';
+            if (es.tilted) enemyTags += '<span class="bg-oracle-red/20 text-oracle-red text-[9px] px-1.5 py-0.5 rounded-full border border-oracle-red/30 font-bold">TILTED</span>';
+            if (es.one_trick) enemyTags += '<span class="bg-oracle-gold/20 text-oracle-gold text-[9px] px-1.5 py-0.5 rounded-full border border-oracle-gold/30 font-bold">OTP</span>';
+            if (es.hot_streak) enemyTags += '<span class="bg-oracle-green/20 text-oracle-green text-[9px] px-1.5 py-0.5 rounded-full border border-oracle-green/30">HOT</span>';
+            if (es.cold_streak) enemyTags += '<span class="bg-oracle-red/20 text-oracle-red text-[9px] px-1.5 py-0.5 rounded-full border border-oracle-red/30">COLD</span>';
+
             let statsLine = '';
             if (es.rank) statsLine += `<span class="text-oracle-text/40">${es.rank.split(' ').slice(0,2).join(' ')}</span>`;
             if (es.champ_wr != null && es.champ_games) statsLine += `<span class="${es.champ_wr >= 55 ? 'text-oracle-green' : es.champ_wr <= 45 ? 'text-oracle-red' : 'text-oracle-gold'}">${es.champ_wr}%</span><span class="text-oracle-text/30">(${es.champ_games}g)</span>`;
             else if (es.win_rate != null) statsLine += `<span class="${es.win_rate >= 55 ? 'text-oracle-green' : es.win_rate <= 45 ? 'text-oracle-red' : 'text-oracle-gold'}">${es.win_rate}% WR</span>`;
+
             return `<div class="flex items-center justify-between py-1.5 px-2 rounded hover:bg-oracle-border/10 transition-colors">
                 <div class="flex items-center gap-2 w-28">
                     <img src="${champIcon(lm.ally_icon)}" class="w-7 h-7 rounded border border-oracle-border" alt="" onerror="this.style.display='none'">
@@ -614,15 +707,16 @@ function renderDashboard(state) {
                         <div class="h-full rounded-full ${style.pct >= 55 ? 'bg-oracle-green' : style.pct >= 45 ? 'bg-oracle-gold' : 'bg-oracle-red'}" style="width: ${style.pct}%"></div>
                     </div>
                     <span class="${style.text} text-[10px] font-bold">${style.label}</span>
-                    ${lm.rating_reason ? `<div class="text-oracle-text/40 text-[9px] text-center leading-tight">${lm.rating_reason}</div>` : ''}
-                    <div class="flex gap-0.5">${badges}</div>
                 </div>
-                <div class="flex items-center gap-2 w-28 justify-end">
-                    <div class="text-right">
-                        <span class="text-oracle-light text-sm">${lm.enemy_champ}</span>
+                <div class="flex items-center gap-2 w-32 justify-end">
+                    <div class="text-right min-w-0">
+                        <div class="flex items-center gap-1 justify-end flex-wrap">
+                            <span class="text-oracle-light text-sm">${lm.enemy_champ}</span>
+                            ${enemyTags ? `<span class="flex gap-0.5">${enemyTags}</span>` : ''}
+                        </div>
                         ${statsLine ? `<div class="flex items-center gap-1 justify-end text-[9px]">${statsLine}</div>` : ''}
                     </div>
-                    <img src="${champIcon(lm.enemy_icon)}" class="w-7 h-7 rounded border border-oracle-border" alt="" onerror="this.style.display='none'">
+                    <img src="${champIcon(lm.enemy_icon)}" class="w-7 h-7 rounded border border-oracle-border shrink-0" alt="" onerror="this.style.display='none'">
                 </div>
             </div>`;
         }
@@ -738,6 +832,7 @@ function updateLiveData(state) {
     // Re-render dashboard if scouting status changed (new data arrived)
     if (state.scouting_status !== lastScoutingStatus) {
         dashboardRendered = false;
+        _clCoachRendered = false;
         renderDashboard(state);
     }
 
@@ -861,6 +956,7 @@ function updateUI(state) {
     } else if (state.phase === 'post_game') {
         showPostGame(state);
         dashboardRendered = false;
+        _clCoachRendered = false;
         lastTipVersion = -1;
         lastDragonType = null;
         lastScoutingStatus = '';
@@ -871,6 +967,7 @@ function updateUI(state) {
         document.getElementById('post-game-state').style.display = 'none';
         document.getElementById('waiting-state').style.display = 'block';
         dashboardRendered = false;
+        _clCoachRendered = false;
         lastTipVersion = -1;
         lastDragonType = null;
         lastScoutingStatus = '';

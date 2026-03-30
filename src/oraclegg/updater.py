@@ -17,7 +17,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 GITHUB_REPO = "cabello986/oraclegg"
 UPDATE_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 

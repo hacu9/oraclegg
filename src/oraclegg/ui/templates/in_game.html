@@ -13,6 +13,15 @@
 <!-- Coach view (new layout) -->
 <div id="game-active" style="display:none">
 
+    <!-- Row 0: Live Tips (most important, top of page) -->
+    <div class="bg-oracle-card border border-oracle-gold/30 rounded-lg p-4 glow mb-3" id="tips-section" style="display:none">
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="text-oracle-gold font-semibold text-xs uppercase tracking-wider">Live Coach Tips</h2>
+            <span class="text-oracle-text/30 text-[10px]" id="tips-count">0 tips</span>
+        </div>
+        <div class="space-y-2" id="tips-feed"></div>
+    </div>
+
     <!-- Row 1: Matchup / Runes / Spells / Skill Order -->
     <div class="grid grid-cols-12 gap-3 mb-3">
         <!-- MATCHUP -->
@@ -112,14 +121,7 @@
         </div>
     </div>
 
-    <!-- Row 4: Live Tips -->
-    <div class="bg-oracle-card border border-oracle-gold/30 rounded-lg p-4 glow" id="tips-section" style="display:none">
-        <div class="flex items-center justify-between mb-3">
-            <h2 class="text-oracle-gold font-semibold text-xs uppercase tracking-wider">Live Coach Tips</h2>
-            <span class="text-oracle-text/30 text-[10px]" id="tips-count">0 tips</span>
-        </div>
-        <div class="space-y-2" id="tips-feed"></div>
-    </div>
+    <!-- (tips moved to top of page) -->
 </div>
 
 <!-- Classic view (original scoreboard) -->
@@ -200,7 +202,7 @@
 </div>
 
 <script>
-let DDRAGON = '';
+let DDRAGON = 'https://ddragon.leagueoflegends.com/cdn/16.6.1/img';
 
 const SPELL_MAP = {
     'Flash': 'SummonerFlash', 'Ignite': 'SummonerDot', 'Teleport': 'SummonerTeleport',
@@ -411,6 +413,43 @@ function renderDashboard(state) {
         const primary = runes.all_runes ? runes.all_runes.slice(0, 4) : [];
         const secondary = runes.all_runes ? runes.all_runes.slice(4, 6) : [];
 
+        const RUNE_DESC = {
+            'Conqueror': 'Gain stacks on hit. At max stacks, gain Adaptive Force and heal.',
+            'Lethal Tempo': 'Gain attack speed on hit, exceeding the cap at max stacks.',
+            'Fleet Footwork': 'Attacking and moving builds Energize. Energize attacks heal and grant MS.',
+            'Press the Attack': 'Hitting an enemy 3 times deals bonus damage and exposes them.',
+            'Electrocute': 'Hit a champ with 3 attacks/abilities to deal bonus adaptive damage.',
+            'Dark Harvest': 'Deal bonus damage to low-health champions. Stacks on takedowns.',
+            'Hail of Blades': 'First 3 attacks against a champion are very fast.',
+            'Predator': 'Enchant boots for a speed boost and bonus damage.',
+            'Summon Aery': 'Abilities and attacks send Aery to damage enemies or shield allies.',
+            'Arcane Comet': 'Damaging abilities hurl a comet at the target.',
+            'Phase Rush': 'Hitting a champ with 3 attacks/abilities grants a burst of MS.',
+            'Grasp of the Undying': 'Every 4s, your next auto heals you and deals bonus damage.',
+            'Aftershock': 'After immobilizing a champ, gain defenses then explode for damage.',
+            'Guardian': 'Guard nearby allies. Shield when you or they take damage.',
+            'Glacial Augment': 'Immobilizing a champion creates a freezing zone that slows.',
+            'First Strike': 'Deal bonus damage when you strike first. Earn gold.',
+            'Triumph': 'Takedowns restore HP and grant bonus gold.',
+            'Legend: Alacrity': 'Gain attack speed on takedowns.',
+            'Legend: Bloodline': 'Gain lifesteal on takedowns.',
+            'Legend: Haste': 'Gain ability haste on takedowns.',
+            'Last Stand': 'Deal more damage when low health.',
+            'Coup de Grace': 'Deal more damage to low-health targets.',
+            'Cut Down': 'Deal more damage to champions with more max HP than you.',
+            'Magical Footwear': 'Get free boots at 12 min. Slightly faster than normal boots.',
+            'Cosmic Insight': 'Gain summoner spell and item haste.',
+            'Bone Plating': 'After being hit, take reduced damage from the next 3 instances.',
+            'Second Wind': 'After taking damage, heal back a portion over time.',
+            'Conditioning': 'After 12 min, gain bonus armor and MR.',
+            'Revitalize': 'Heals and shields are stronger on low-health targets.',
+            'Unflinching': 'Gain tenacity and slow resistance, especially when low HP.',
+            'Taste of Blood': 'Heal when you damage a champion.',
+            'Eyeball Collection': 'Gain adaptive force per takedown.',
+            'Treasure Hunter': 'Gain gold on unique champion takedowns.',
+            'Sudden Impact': 'After dashing/blinking, gain lethality and magic pen.',
+        };
+
         const DDRAGON_BASE = 'https://ddragon.leagueoflegends.com/cdn/img/';
         function runeIconUrl(icon) {
             if (!icon) return '';
@@ -429,9 +468,10 @@ function renderDashboard(state) {
             return `<div class="relative group cursor-pointer flex items-center gap-1.5">
                 ${imgOrLetter}
                 <span class="${isKeystone ? 'text-oracle-light text-xs font-bold' : 'text-oracle-text/60 text-[10px]'}">${r.name || 'Unknown'}</span>
-                <div class="absolute bottom-full left-0 mb-2 px-3 py-2 bg-oracle-card border border-oracle-border rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 w-52">
+                <div class="absolute bottom-full left-0 mb-2 px-3 py-2 bg-oracle-card border border-oracle-border rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 w-56">
                     <div class="text-oracle-light text-xs font-bold">${r.name || 'Unknown'}</div>
-                    <div class="text-oracle-text/50 text-[10px] mt-0.5">${r.tree || ''} tree${r.slot === 0 ? ' — Keystone' : ''}</div>
+                    <div class="text-oracle-text/40 text-[10px]">${r.tree || ''} tree${r.slot === 0 ? ' — Keystone' : ''}</div>
+                    ${RUNE_DESC[r.name] ? `<div class="text-oracle-text/70 text-[10px] mt-1 leading-tight">${RUNE_DESC[r.name]}</div>` : ''}
                 </div>
             </div>`;
         }
@@ -569,9 +609,12 @@ function renderDashboard(state) {
                     <img src="${champIcon(lm.ally_icon)}" class="w-7 h-7 rounded border border-oracle-border" alt="" onerror="this.style.display='none'">
                     <span class="text-oracle-light text-sm truncate">${lm.ally_champ}</span>
                 </div>
-                <div class="flex flex-col items-center gap-0.5">
-                    <span class="${style.bg} ${style.text} border ${style.border} text-[10px] px-2 py-0.5 rounded-full font-bold">${style.label}</span>
-                    ${lm.rating_reason ? `<div class="text-oracle-text/40 text-[9px] text-center max-w-[100px] leading-tight">${lm.rating_reason}</div>` : ''}
+                <div class="flex flex-col items-center gap-0.5 w-24">
+                    <div class="w-full h-2 bg-oracle-border/30 rounded-full overflow-hidden">
+                        <div class="h-full rounded-full ${style.pct >= 55 ? 'bg-oracle-green' : style.pct >= 45 ? 'bg-oracle-gold' : 'bg-oracle-red'}" style="width: ${style.pct}%"></div>
+                    </div>
+                    <span class="${style.text} text-[10px] font-bold">${style.label}</span>
+                    ${lm.rating_reason ? `<div class="text-oracle-text/40 text-[9px] text-center leading-tight">${lm.rating_reason}</div>` : ''}
                     <div class="flex gap-0.5">${badges}</div>
                 </div>
                 <div class="flex items-center gap-2 w-28 justify-end">
@@ -595,7 +638,12 @@ function renderDashboard(state) {
                     ${botEnemy.map(b => `<img src="${champIcon(b.ally_icon)}" class="w-7 h-7 rounded border border-oracle-border" alt="" onerror="this.style.display='none'">`).join('')}
                     <span class="text-oracle-text/50 text-xs ml-1">Bot</span>
                 </div>
-                <span class="${bs.bg} ${bs.text} border ${bs.border} text-[10px] px-2 py-0.5 rounded-full font-bold">${bs.label}</span>
+                <div class="flex flex-col items-center gap-0.5 w-24">
+                    <div class="w-full h-2 bg-oracle-border/30 rounded-full overflow-hidden">
+                        <div class="h-full rounded-full ${bs.pct >= 55 ? 'bg-oracle-green' : bs.pct >= 45 ? 'bg-oracle-gold' : 'bg-oracle-red'}" style="width: ${bs.pct}%"></div>
+                    </div>
+                    <span class="${bs.text} text-[10px] font-bold">${bs.label}</span>
+                </div>
                 <div class="flex items-center gap-1 w-28 justify-end">
                     <span class="text-oracle-text/50 text-xs mr-1">Bot</span>
                     ${botEnemy.map(b => `<img src="${champIcon(b.enemy_icon)}" class="w-7 h-7 rounded border border-oracle-border" alt="" onerror="this.style.display='none'">`).join('')}

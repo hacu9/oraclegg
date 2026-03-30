@@ -21,9 +21,30 @@ async def lifespan(app: FastAPI):
     except Exception:
         print(f"  DDragon version: {settings.ddragon_version} (default, fetch failed)")
 
+    # Auto-seed if DB is empty (first run from .exe)
+    from sqlalchemy import select, func
+    from oraclegg.db.engine import async_session
+    from oraclegg.db.models import Champion
+    async with async_session() as session:
+        champ_count = (await session.execute(
+            select(func.count()).select_from(Champion)
+        )).scalar()
+    if champ_count == 0:
+        print("  First run — seeding champion and item data...")
+        try:
+            from oraclegg.static_data.manager import seed_all
+            await seed_all()
+            print("  Seed complete.")
+        except Exception as e:
+            print(f"  Seed failed: {e} (you can retry from Settings)")
+
     # Start background game monitor
     from oraclegg.game_loop.monitor import game_monitor_loop
     monitor_task = asyncio.create_task(game_monitor_loop())
+
+    # Auto-run pipeline if API key is set but no builds exist
+    from oraclegg.pipeline.runner import auto_pipeline_if_needed
+    asyncio.create_task(auto_pipeline_if_needed())
 
     print(f"\n  OracleGG running at http://{settings.host}:{settings.port}")
     print(f"  Game monitor active (polling every {settings.live_client_poll_interval}s)")

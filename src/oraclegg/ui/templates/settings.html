@@ -126,6 +126,20 @@
         <div id="summoner-status" class="text-xs mt-2"></div>
     </div>
 
+    <!-- Data Pipeline -->
+    <div class="bg-oracle-card border border-oracle-border rounded-lg p-6">
+        <h2 class="text-oracle-light font-semibold mb-2">Build Data</h2>
+        <p class="text-oracle-text/60 text-sm mb-4">Download Master+ match data and generate build recommendations. Requires a valid API key.</p>
+
+        <div class="flex items-center gap-3">
+            <button onclick="runPipelineFromSettings()" id="settings-pipeline-btn"
+                class="bg-oracle-blue/20 border border-oracle-blue text-oracle-blue px-4 py-2 rounded text-sm font-medium hover:bg-oracle-blue/30 transition-colors">
+                Download Build Data
+            </button>
+            <span id="settings-pipeline-status" class="text-oracle-text/60 text-xs"></span>
+        </div>
+    </div>
+
     <!-- General -->
     <div class="bg-oracle-card border border-oracle-border rounded-lg p-6">
         <h2 class="text-oracle-light font-semibold mb-2">General</h2>
@@ -308,5 +322,42 @@ document.querySelectorAll('.prio-btn').forEach(btn => {
         saveSettings(settings);
     });
 });
+
+// Pipeline
+async function runPipelineFromSettings() {
+    const btn = document.getElementById('settings-pipeline-btn');
+    const status = document.getElementById('settings-pipeline-status');
+    btn.disabled = true; btn.textContent = 'Starting...';
+    try {
+        const r = await fetch('/api/pipeline/run', { method: 'POST' });
+        const d = await r.json();
+        if (d.error) { status.textContent = d.error; btn.disabled = false; btn.textContent = 'Download Build Data'; return; }
+        status.textContent = 'Pipeline started...';
+        pollSettingsPipeline();
+    } catch(e) { btn.disabled = false; btn.textContent = 'Download Build Data'; status.textContent = 'Failed to start'; }
+}
+
+function pollSettingsPipeline() {
+    const btn = document.getElementById('settings-pipeline-btn');
+    const status = document.getElementById('settings-pipeline-status');
+    function check() {
+        fetch('/api/pipeline/status').then(r => r.json()).then(s => {
+            status.textContent = s.progress || s.status;
+            if (s.running) { setTimeout(check, 2000); }
+            else if (s.status === 'complete') { btn.textContent = 'Done!'; status.className = 'text-oracle-green text-xs'; }
+            else if (s.status === 'error') { btn.disabled = false; btn.textContent = 'Retry'; status.className = 'text-oracle-red text-xs'; }
+        }).catch(() => { setTimeout(check, 3000); });
+    }
+    check();
+}
+
+// Check if pipeline running on load
+fetch('/api/pipeline/status').then(r => r.json()).then(s => {
+    if (s.running) { document.getElementById('settings-pipeline-btn').disabled = true; pollSettingsPipeline(); }
+    else if (s.status === 'complete' && s.last_result) {
+        document.getElementById('settings-pipeline-status').textContent =
+            `Last run: ${s.last_result.builds_created} builds from ${s.last_result.matches_fetched} matches`;
+    }
+}).catch(() => {});
 </script>
 {% endblock %}

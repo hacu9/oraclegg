@@ -55,17 +55,34 @@
             <div class="flex items-start gap-3">
                 <span class="bg-oracle-blue/20 text-oracle-blue text-xs px-2 py-0.5 rounded-full border border-oracle-blue/30 shrink-0 mt-0.5">NEXT</span>
                 <div>
-                    <span class="text-oracle-light font-medium">Run the data pipeline</span>
-                    <p class="text-oracle-text/60 text-xs mt-0.5">
-                        Run: <code class="bg-oracle-bg px-1.5 py-0.5 rounded text-oracle-gold text-xs">uv run python scripts/run_pipeline.py --players 50 --min-sample 5</code>
-                        <br>This collects Master+ match data and generates build recommendations. Takes 2-5 minutes with a dev key.
+                    <span class="text-oracle-light font-medium">Download build data from Master+ matches</span>
+                    <p class="text-oracle-text/60 text-xs mt-0.5 mb-2">
+                        This collects high-elo match data and generates build recommendations. Takes 2-5 minutes.
                     </p>
+                    <button onclick="runPipeline()" id="pipeline-btn"
+                        class="bg-oracle-blue/20 border border-oracle-blue text-oracle-blue px-4 py-1.5 rounded text-xs font-medium hover:bg-oracle-blue/30 transition-colors">
+                        Download Build Data
+                    </button>
                 </div>
             </div>
             {% endif %}
         </div>
     </div>
     {% endif %}
+
+    <!-- Pipeline status (always visible when running) -->
+    <div id="pipeline-status" style="display:none" class="bg-oracle-card border border-oracle-blue/30 rounded-lg p-4">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-4 h-4 border-2 border-oracle-blue border-t-transparent rounded-full animate-spin" id="pipeline-spinner"></div>
+                <div>
+                    <span class="text-oracle-light text-sm font-medium" id="pipeline-status-text">Running pipeline...</span>
+                    <span class="text-oracle-text/50 text-xs block" id="pipeline-progress-text"></span>
+                </div>
+            </div>
+            <span class="text-oracle-blue text-xs" id="pipeline-phase">collecting</span>
+        </div>
+    </div>
 
     <!-- Stats cards -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -178,6 +195,64 @@
 </div>
 
 <script>
+    // ─── Pipeline ──────────────────────────────────────
+    async function runPipeline() {
+        const btn = document.getElementById('pipeline-btn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Starting...'; }
+        try {
+            const r = await fetch('/api/pipeline/run', { method: 'POST' });
+            const d = await r.json();
+            if (d.error) { alert(d.error); if (btn) { btn.disabled = false; btn.textContent = 'Download Build Data'; } return; }
+            pollPipeline();
+        } catch(e) { if (btn) { btn.disabled = false; btn.textContent = 'Download Build Data'; } }
+    }
+
+    function pollPipeline() {
+        const statusDiv = document.getElementById('pipeline-status');
+        const statusText = document.getElementById('pipeline-status-text');
+        const progressText = document.getElementById('pipeline-progress-text');
+        const phaseEl = document.getElementById('pipeline-phase');
+        const spinner = document.getElementById('pipeline-spinner');
+
+        function check() {
+            fetch('/api/pipeline/status').then(r => r.json()).then(s => {
+                if (s.running || s.status === 'collecting' || s.status === 'aggregating') {
+                    statusDiv.style.display = 'block';
+                    statusText.textContent = s.progress || 'Running...';
+                    phaseEl.textContent = s.status;
+                    spinner.style.display = 'block';
+                    setTimeout(check, 2000);
+                } else if (s.status === 'complete') {
+                    statusDiv.style.display = 'block';
+                    statusText.textContent = s.progress || 'Pipeline complete!';
+                    phaseEl.textContent = 'done';
+                    spinner.style.display = 'none';
+                    progressText.textContent = 'Reload the page to see updated data.';
+                    // Auto-reload after 2s
+                    setTimeout(() => location.reload(), 2500);
+                } else if (s.status === 'error') {
+                    statusDiv.style.display = 'block';
+                    statusText.textContent = 'Pipeline failed: ' + (s.error || 'Unknown error');
+                    phaseEl.textContent = 'error';
+                    spinner.style.display = 'none';
+                    const btn = document.getElementById('pipeline-btn');
+                    if (btn) { btn.disabled = false; btn.textContent = 'Retry'; }
+                } else {
+                    statusDiv.style.display = 'none';
+                }
+            }).catch(() => { setTimeout(check, 3000); });
+        }
+        check();
+    }
+
+    // Check if pipeline is already running on page load
+    fetch('/api/pipeline/status').then(r => r.json()).then(s => {
+        if (s.running || s.status === 'collecting' || s.status === 'aggregating') {
+            pollPipeline();
+        }
+    }).catch(() => {});
+
+    // ─── Champions ─────────────────────────────────────
     let allChampions = [];
 
     // Load champion list into all dropdowns

@@ -463,6 +463,36 @@ async def pipeline_stats():
     }
 
 
+# ─── Pipeline ────────────────────────────────────────────────────────
+
+@router.post("/api/pipeline/run")
+async def run_pipeline(
+    players: int = Query(default=50),
+    min_sample: int = Query(default=5),
+):
+    """Trigger the data pipeline (collection + aggregation) in background."""
+    if not settings.api_key_configured:
+        return JSONResponse(status_code=400, content={
+            "error": "Riot API key not configured. Set it in Settings first."
+        })
+
+    from oraclegg.pipeline.runner import trigger_pipeline, pipeline_state
+    started = trigger_pipeline(max_players=players, min_sample=min_sample)
+    if not started:
+        return JSONResponse(status_code=409, content={
+            "error": "Pipeline is already running.",
+            **pipeline_state,
+        })
+    return {"status": "started", "message": "Pipeline started in background."}
+
+
+@router.get("/api/pipeline/status")
+async def get_pipeline_status():
+    """Get current pipeline execution status."""
+    from oraclegg.pipeline.runner import pipeline_state
+    return pipeline_state
+
+
 @router.get("/api/game-state")
 async def get_game_state():
     """Get current game state (polled by UI)."""

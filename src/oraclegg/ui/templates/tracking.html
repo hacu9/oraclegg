@@ -213,7 +213,7 @@ function renderCharts(matches) {
 
     // Reverse so oldest first (left to right)
     const sorted = [...matches].reverse();
-    const labels = sorted.map((m, i) => `G${i + 1}`);
+    const labels = sorted.map(m => m.champion);
 
     // Rolling win rate (3-game window)
     const wrData = [];

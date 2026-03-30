@@ -118,9 +118,10 @@ class TipEngine:
         tips.sort(key=lambda t: t.priority)
 
         # Filter out already-given one-time tips
+        # Use first 30 chars of message as dedup key (catches "Team is far behind" variants)
         filtered = []
         for t in tips:
-            key = f"{t.category}:{hash(t.message)}"
+            key = f"{t.category}:{t.message[:30]}"
             if key not in self._game_tips_given:
                 filtered.append(t)
                 self._game_tips_given.add(key)

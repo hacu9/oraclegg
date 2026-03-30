@@ -104,44 +104,44 @@ def _get_primary_class(tags_json: str) -> str:
     return "Fighter"
 
 
-def _rate_matchup_from_scouting(enemy_report: dict | None) -> str:
-    """Rate a matchup based on scouting data (enemy player stats)."""
+def _rate_matchup_from_scouting(enemy_report: dict | None) -> tuple[str, str]:
+    """Rate a matchup based on scouting data (enemy player stats).
+
+    Returns (rating, reason) tuple.
+    """
     if not enemy_report:
-        return "EVEN"
+        return "EVEN", ""
 
     tendencies = enemy_report.get("tendencies", {})
 
-    # First-timing = strong advantage for us
     if tendencies.get("first_timing"):
-        return "POSITIVE"
+        return "POSITIVE", "First-timing this champ"
 
-    # Tilted player = advantage
     if tendencies.get("tilted"):
-        return "POSITIVE"
+        streak = tendencies["tilted"].get("loss_streak", 3)
+        return "POSITIVE", f"On a {streak}-game loss streak"
 
-    # Check their current champ stats
     champ_stats = tendencies.get("current_champ_stats")
     if champ_stats:
         wr = champ_stats.get("win_rate", 50)
         games = champ_stats.get("games", 0)
         if games >= 5 and wr >= 60:
-            return "NEGATIVE"  # They're good on this champ
+            return "NEGATIVE", f"{wr}% WR on this champ ({games}G)"
         if games >= 5 and wr <= 40:
-            return "POSITIVE"  # They struggle on this champ
+            return "POSITIVE", f"Only {wr}% WR on this champ ({games}G)"
 
-    # Check recent overall win rate
     recent = tendencies.get("recent_winrate", {})
     pct = recent.get("pct", 50)
     if pct >= 70:
-        return "NEGATIVE"
+        return "NEGATIVE", f"{pct}% recent WR — hot streak"
     if pct <= 30:
-        return "POSITIVE"
+        return "POSITIVE", f"Only {pct}% recent WR — cold streak"
 
-    # OTP on their champ = danger
     if tendencies.get("one_trick"):
-        return "NEGATIVE"
+        otp = tendencies["one_trick"]
+        return "NEGATIVE", f"OTP ({otp.get('pct', 60)}% games on this champ)"
 
-    return "EVEN"
+    return "EVEN", ""
 
 
 def _rate_matchup_class(ally_tags: str, enemy_tags: str) -> str:
@@ -203,9 +203,10 @@ def _pair_lanes(
             enemy_info = champ_data.get(enemy_name, {})
 
             # Try scouting-based rating first, fall back to class heuristic
+            reason = ""
             enemy_report = (enemy_scouting or {}).get(enemy_name)
             if enemy_report:
-                rating = _rate_matchup_from_scouting(enemy_report)
+                rating, reason = _rate_matchup_from_scouting(enemy_report)
             else:
                 rating = _rate_matchup_class(
                     ally_info.get("tags", "[]"),
@@ -243,6 +244,7 @@ def _pair_lanes(
                 "enemy_champ": enemy_name,
                 "enemy_icon": CHAMP_ICON_MAP.get(enemy_name, enemy_name),
                 "rating": rating,
+                "rating_reason": reason,
                 "enemy_stats": enemy_stats,
             })
 

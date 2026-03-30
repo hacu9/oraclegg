@@ -30,6 +30,18 @@
         </div>
     </div>
 
+    <!-- Trend Charts -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="bg-oracle-card border border-oracle-border rounded-lg p-6">
+            <h2 class="text-oracle-light font-semibold mb-4">Win Rate Trend</h2>
+            <canvas id="wr-chart" height="200"></canvas>
+        </div>
+        <div class="bg-oracle-card border border-oracle-border rounded-lg p-6">
+            <h2 class="text-oracle-light font-semibold mb-4">KDA Trend</h2>
+            <canvas id="kda-chart" height="200"></canvas>
+        </div>
+    </div>
+
     <!-- Champion stats -->
     <div class="bg-oracle-card border border-oracle-border rounded-lg p-6">
         <h2 class="text-oracle-light font-semibold mb-4">Champion Performance</h2>
@@ -195,6 +207,75 @@ async function showAnalysis(matchId) {
     }
 }
 
+// Trend charts
+function renderCharts(matches) {
+    if (!matches.length || typeof Chart === 'undefined') return;
+
+    // Reverse so oldest first (left to right)
+    const sorted = [...matches].reverse();
+    const labels = sorted.map((m, i) => `G${i + 1}`);
+
+    // Rolling win rate (3-game window)
+    const wrData = [];
+    for (let i = 0; i < sorted.length; i++) {
+        const window = sorted.slice(Math.max(0, i - 2), i + 1);
+        const wins = window.filter(m => m.win).length;
+        wrData.push(Math.round(wins / window.length * 100));
+    }
+
+    // KDA per game
+    const kdaData = sorted.map(m => m.kda_ratio);
+
+    const chartOpts = {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { grid: { color: '#1e2a36' }, ticks: { color: '#a09b8c', font: { size: 10 } } },
+            y: { grid: { color: '#1e2a36' }, ticks: { color: '#a09b8c', font: { size: 10 } } },
+        },
+    };
+
+    // Win rate chart
+    new Chart(document.getElementById('wr-chart'), {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                data: wrData,
+                borderColor: '#c89b3c',
+                backgroundColor: 'rgba(200, 155, 60, 0.1)',
+                fill: true,
+                tension: 0.3,
+                pointRadius: 3,
+                pointBackgroundColor: sorted.map(m => m.win ? '#28c76f' : '#e84057'),
+            }],
+        },
+        options: {
+            ...chartOpts,
+            scales: {
+                ...chartOpts.scales,
+                y: { ...chartOpts.scales.y, min: 0, max: 100, ticks: { ...chartOpts.scales.y.ticks, callback: v => v + '%' } },
+            },
+        },
+    });
+
+    // KDA chart
+    new Chart(document.getElementById('kda-chart'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                data: kdaData,
+                backgroundColor: kdaData.map(k => k >= 4 ? 'rgba(40, 199, 111, 0.6)' : k >= 2.5 ? 'rgba(200, 155, 60, 0.6)' : 'rgba(232, 64, 87, 0.6)'),
+                borderColor: kdaData.map(k => k >= 4 ? '#28c76f' : k >= 2.5 ? '#c89b3c' : '#e84057'),
+                borderWidth: 1,
+                borderRadius: 3,
+            }],
+        },
+        options: chartOpts,
+    });
+}
+
 // Load match history
 fetch('/api/tracking/matches').then(r => r.json()).then(matches => {
     if (!matches.length) {
@@ -226,6 +307,9 @@ fetch('/api/tracking/matches').then(r => r.json()).then(matches => {
     });
     html += '</div>';
     document.getElementById('match-history').innerHTML = html;
+
+    // Render trend charts
+    renderCharts(matches);
 });
 </script>
 {% endblock %}

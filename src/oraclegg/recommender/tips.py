@@ -112,6 +112,7 @@ class TipEngine:
         tips.extend(self._check_strategy(allies, enemies, game_time))
         tips.extend(self._check_boots(me, enemies, game_time))
         tips.extend(self._check_dragon(allies, enemies, game_state))
+        tips.extend(self._check_matchup_kb(me, enemies))
 
         # Sort by priority, dedup
         tips.sort(key=lambda t: t.priority)
@@ -344,6 +345,28 @@ class TipEngine:
 
         return tips
 
+
+    def _check_matchup_kb(self, me: dict, enemies: list) -> list[Tip]:
+        """Fire matchup-specific tips from knowledge base (once per game)."""
+        key = "matchup_kb"
+        if key in self._game_tips_given:
+            return []
+        self._game_tips_given.add(key)
+
+        from oraclegg.recommender.matchup_kb import get_matchup_tips
+        my_champ = me.get("championName", "")
+        tips = []
+        for enemy in enemies:
+            e_champ = enemy.get("championName", "")
+            matchup_tips = get_matchup_tips(my_champ, e_champ)
+            if matchup_tips:
+                # Only show the first tip per enemy to avoid spam
+                tips.append(Tip(
+                    priority=1,
+                    category="strategy",
+                    message=f"vs {e_champ}: {matchup_tips[0]}",
+                ))
+        return tips[:3]  # Max 3 matchup tips
 
     def _check_dragon(self, allies: list, enemies: list, game_state: dict) -> list[Tip]:
         """Auto-evaluate dragon when rift transforms."""

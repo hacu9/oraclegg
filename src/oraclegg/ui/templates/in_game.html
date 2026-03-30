@@ -207,6 +207,43 @@ function champIcon(name) { return `${DDRAGON}/champion/${name}.png`; }
 function itemIcon(id) { return `${DDRAGON}/item/${id}.png`; }
 function spellIcon(name) { return `${DDRAGON}/spell/${SPELL_MAP[name] || name}.png`; }
 
+// Sound notification for urgent tips
+let _audioCtx = null;
+function playTipSound(priority) {
+    try {
+        let s = {}; try { s = JSON.parse(localStorage.getItem('oraclegg_settings')) || {}; } catch {}
+        if (s.sound_notifications === false) return;
+    } catch {}
+
+    try {
+        if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = _audioCtx.createOscillator();
+        const gain = _audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(_audioCtx.destination);
+        gain.gain.value = 0.15;
+
+        if (priority === 0) {
+            // Urgent: two quick high tones
+            osc.frequency.value = 880;
+            osc.start();
+            osc.stop(_audioCtx.currentTime + 0.1);
+            const osc2 = _audioCtx.createOscillator();
+            const gain2 = _audioCtx.createGain();
+            osc2.connect(gain2); gain2.connect(_audioCtx.destination);
+            gain2.gain.value = 0.15; osc2.frequency.value = 1100;
+            osc2.start(_audioCtx.currentTime + 0.15);
+            osc2.stop(_audioCtx.currentTime + 0.25);
+        } else if (priority === 1) {
+            // Important: single soft tone
+            osc.frequency.value = 660;
+            osc.start();
+            osc.stop(_audioCtx.currentTime + 0.12);
+        }
+        // Info (priority 2): no sound
+    } catch {}
+}
+
 // View toggle
 let currentView = localStorage.getItem('oraclegg_view') || 'classic';
 
@@ -683,6 +720,11 @@ function updateLiveData(state) {
         document.getElementById('tips-count').textContent = allTips.length + ' tips';
 
         if (newVersion !== lastTipVersion) {
+            // Play sound for the highest priority new tip
+            if (lastTipVersion >= 0 && allTips.length > 0) {
+                const newest = allTips[allTips.length - 1];
+                if (newest) playTipSound(newest.priority);
+            }
             lastTipVersion = newVersion;
 
             let tipSettings = {};

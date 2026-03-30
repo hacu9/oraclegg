@@ -409,6 +409,39 @@ async def save_summoner(request: Request):
     return {"ok": True}
 
 
+@router.get("/api/champ-select/live")
+async def champ_select_live():
+    """Get live champ select data from LCU if available."""
+    from oraclegg.game_loop.monitor import game_state
+    lcu_phase = game_state.get("lcu_phase", "idle")
+    data = game_state.get("champ_select_data")
+
+    if lcu_phase != "champ_select" or not data:
+        return {"active": False}
+
+    return {
+        "active": True,
+        "data": data,
+    }
+
+
+@router.get("/api/matchup-tips")
+async def get_matchup_tips(
+    your_champ: str = Query(...),
+    enemy_champ: str = Query(...),
+    role: str = Query(default=""),
+):
+    """Get matchup-specific tips from the knowledge base."""
+    from oraclegg.recommender.matchup_kb import get_matchup_tips, get_role_tips
+    tips = get_matchup_tips(your_champ, enemy_champ)
+    role_tips = get_role_tips(role) if role else []
+    return {
+        "matchup_tips": tips,
+        "role_tips": role_tips,
+        "has_specific": len(tips) > 0,
+    }
+
+
 @router.get("/api/boots")
 async def get_boot_recommendation(
     champion: str = Query(...),

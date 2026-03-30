@@ -47,6 +47,13 @@ async def lifespan(app: FastAPI):
     from oraclegg.pipeline.runner import auto_pipeline_if_needed
     asyncio.create_task(auto_pipeline_if_needed())
 
+    # Start weekly scheduler
+    try:
+        from oraclegg.pipeline.scheduler import start_scheduler
+        start_scheduler()
+    except Exception as e:
+        print(f"  Scheduler failed to start: {e} (non-critical)")
+
     print(f"\n  OracleGG running at http://{settings.host}:{settings.port}")
     print(f"  Game monitor active (polling every {settings.live_client_poll_interval}s)")
     if not settings.api_key_configured:

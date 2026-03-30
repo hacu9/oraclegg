@@ -6,9 +6,17 @@ summoner spell names, and other shared lookups.
 
 # Champions whose Live Client name differs from Data Dragon key
 CHAMP_ICON_MAP = {
-    "Wukong": "MonkeyKing",
-    "Renata Glasc": "Renata",
-    "Nunu & Willump": "Nunu",
+    # Spaces / special characters
+    "Aurelion Sol": "AurelionSol",
+    "Dr. Mundo": "DrMundo",
+    "Jarvan IV": "JarvanIV",
+    "Lee Sin": "LeeSin",
+    "Master Yi": "MasterYi",
+    "Miss Fortune": "MissFortune",
+    "Tahm Kench": "TahmKench",
+    "Twisted Fate": "TwistedFate",
+    "Xin Zhao": "XinZhao",
+    # Apostrophes
     "Kai'Sa": "Kaisa",
     "Kha'Zix": "Khazix",
     "Bel'Veth": "Belveth",
@@ -17,6 +25,10 @@ CHAMP_ICON_MAP = {
     "Cho'Gath": "Chogath",
     "Rek'Sai": "RekSai",
     "K'Sante": "KSante",
+    # Renamed / special
+    "Wukong": "MonkeyKing",
+    "Renata Glasc": "Renata",
+    "Nunu & Willump": "Nunu",
     "LeBlanc": "Leblanc",
 }
 

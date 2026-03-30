@@ -22,6 +22,11 @@ LOCKFILE_PATHS = {
         Path("C:/Riot Games/League of Legends/lockfile"),
         Path("D:/Riot Games/League of Legends/lockfile"),
     ],
+    "Linux": [
+        # WSL2 paths (League runs on Windows, lockfile accessible via /mnt/c)
+        Path("/mnt/c/Riot Games/League of Legends/lockfile"),
+        Path("/mnt/d/Riot Games/League of Legends/lockfile"),
+    ],
     "Darwin": [  # macOS
         Path("/Applications/League of Legends.app/Contents/LoL/lockfile"),
     ],
@@ -80,8 +85,27 @@ class LCUClient:
             self.password = creds["password"]
 
             auth = base64.b64encode(f"riot:{self.password}".encode()).decode()
+
+            # On WSL, use Windows host IP since LCU binds to Windows localhost
+            host = "127.0.0.1"
+            try:
+                with open("/proc/version", "r") as f:
+                    if "microsoft" in f.read().lower():
+                        # Try Windows gateway IP
+                        import subprocess
+                        result = subprocess.run(
+                            ["ip", "route", "show", "default"],
+                            capture_output=True, text=True, timeout=2,
+                        )
+                        for word in result.stdout.split():
+                            if word.count(".") == 3:
+                                host = word
+                                break
+            except Exception:
+                pass
+
             self._client = httpx.AsyncClient(
-                base_url=f"https://127.0.0.1:{self.port}",
+                base_url=f"https://{host}:{self.port}",
                 headers={"Authorization": f"Basic {auth}"},
                 verify=False,  # LCU uses self-signed cert
                 timeout=httpx.Timeout(10.0),

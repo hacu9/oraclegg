@@ -95,6 +95,7 @@ def main():
     print()
 
     # Try native window, fall back to browser
+    use_browser = False
     try:
         import webview
         print("  Opening native window...")
@@ -109,7 +110,14 @@ def main():
         )
         webview.start()  # Blocks until window closed
     except ImportError:
-        print("  Opening browser...")
+        use_browser = True
+    except Exception as e:
+        print(f"  Native window failed: {e}")
+        print("  Tip: Install Edge WebView2 Runtime from https://developer.microsoft.com/en-us/microsoft-edge/webview2/")
+        use_browser = True
+
+    if use_browser:
+        print("  Opening browser instead...")
         webbrowser.open(url)
         print("  OracleGG is running. Close this window to stop.")
         print()

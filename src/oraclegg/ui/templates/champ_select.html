@@ -96,6 +96,49 @@
     // Auto-redirect handled by base.html global state machine
 
     let champions = [];
+    let champById = {};
+    let liveSelectActive = false;
+
+    // Poll for live champ select data from LCU
+    async function pollChampSelect() {
+        try {
+            const r = await fetch('/api/champ-select/live');
+            const d = await r.json();
+            if (d.active && d.data && !liveSelectActive) {
+                liveSelectActive = true;
+                // Parse LCU champ select data to extract picks
+                const actions = d.data.actions || [];
+                const myTeam = d.data.myTeam || [];
+                const theirTeam = d.data.theirTeam || [];
+
+                // Auto-fill enemy picks
+                const enemySelects = document.querySelectorAll('.enemy-champ');
+                theirTeam.forEach((p, i) => {
+                    if (p.championId && enemySelects[i]) {
+                        enemySelects[i].value = p.championId;
+                    }
+                });
+
+                // Auto-fill your pick
+                const localPlayer = myTeam.find(p => p.cellId === d.data.localPlayerCellId);
+                if (localPlayer && localPlayer.championId) {
+                    document.getElementById('your-champ').value = localPlayer.championId;
+                }
+
+                // Show indicator
+                const heading = document.querySelector('h1');
+                if (heading && !document.getElementById('live-cs-badge')) {
+                    heading.insertAdjacentHTML('afterend',
+                        '<span id="live-cs-badge" class="ml-3 bg-oracle-green/20 text-oracle-green text-xs px-2 py-1 rounded-full border border-oracle-green/30 animate-pulse">LIVE</span>'
+                    );
+                }
+            } else if (!d.active) {
+                liveSelectActive = false;
+            }
+        } catch {}
+    }
+    setInterval(pollChampSelect, 2000);
+    pollChampSelect();
 
     // Load champions
     fetch('/api/champions')

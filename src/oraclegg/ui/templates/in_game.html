@@ -112,18 +112,16 @@
     </div>
 </div>
 
-<!-- Post-game state -->
+<!-- Post-game state (auto-redirects to /tracking after 8s via base.html) -->
 <div id="post-game-state" style="display:none">
     <div class="bg-oracle-card border border-oracle-border rounded-lg p-8 text-center space-y-4">
         <div class="text-oracle-gold text-2xl font-bold" id="pg-result">Game Ended</div>
         <div class="flex items-center justify-center gap-4" id="pg-summary"></div>
-        <div class="flex gap-3 justify-center mt-4">
+        <p class="text-oracle-text/50 text-xs mt-2">Redirecting to match analysis...</p>
+        <div class="flex gap-3 justify-center mt-2">
             <a href="/tracking" class="bg-oracle-gold/20 border border-oracle-gold text-oracle-gold px-6 py-2 rounded hover:bg-oracle-gold/30 transition-colors text-sm font-medium">
-                View Match Analysis
+                View Now
             </a>
-            <button onclick="dismissPostGame()" class="text-oracle-text/40 hover:text-oracle-text text-sm px-4 py-2">
-                Dismiss
-            </button>
         </div>
     </div>
 </div>

@@ -71,6 +71,7 @@ async def dashboard(request: Request):
         "champion_count": champ_count.scalar(),
         "api_key_set": settings.api_key_configured,
         "summoner_set": settings.summoner_configured,
+        "summoner_tag": settings.summoner_tag,
     })
 
 
@@ -336,6 +337,41 @@ async def save_api_key(request: Request):
     global _riot_client
     _riot_client = None
     return {"valid": True}
+
+
+@router.post("/api/settings/region")
+async def save_region(request: Request):
+    """Save region/platform settings."""
+    data = await request.json()
+    platform = data.get("platform", "").strip()
+    if not platform:
+        return {"ok": False, "error": "Platform is required"}
+
+    # Map platform to region routing
+    region_map = {
+        "na1": "americas", "br1": "americas", "la1": "americas", "la2": "americas",
+        "euw1": "europe", "eun1": "europe", "tr1": "europe", "ru": "europe",
+        "kr": "asia", "jp1": "asia",
+        "oc1": "sea", "ph2": "sea", "sg2": "sea", "th2": "sea", "tw2": "sea", "vn2": "sea",
+    }
+    region = region_map.get(platform, "americas")
+
+    # Save to .env
+    import re
+    env_path = Path(".env")
+    if env_path.exists():
+        content = env_path.read_text()
+        for key, val in [("RIOT_PLATFORM", platform), ("RIOT_REGION", region)]:
+            if f"{key}=" in content:
+                content = re.sub(f"{key}=.*", f"{key}={val}", content)
+            else:
+                content += f"\n{key}={val}\n"
+        env_path.write_text(content)
+
+    # Hot-reload
+    settings.riot_platform = platform
+    settings.riot_region = region
+    return {"ok": True, "platform": platform, "region": region}
 
 
 @router.post("/api/settings/summoner")

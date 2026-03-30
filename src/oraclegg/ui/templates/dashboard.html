@@ -20,12 +20,20 @@
             {% if not api_key_set %}
             <div class="flex items-start gap-3">
                 <span class="bg-oracle-red/20 text-oracle-red text-xs px-2 py-0.5 rounded-full border border-oracle-red/30 shrink-0 mt-0.5">REQUIRED</span>
-                <div>
+                <div class="flex-1">
                     <span class="text-oracle-light font-medium">Set your Riot API key</span>
-                    <p class="text-oracle-text/60 text-xs mt-0.5">
-                        Get a free key at <a href="https://developer.riotgames.com/" target="_blank" class="text-oracle-blue hover:underline">developer.riotgames.com</a>,
-                        then go to <a href="/settings" class="text-oracle-gold hover:underline">Settings</a> to save it. Dev keys expire every 24 hours.
+                    <p class="text-oracle-text/60 text-xs mt-0.5 mb-2">
+                        Get a free key at <a href="https://developer.riotgames.com/" target="_blank" class="text-oracle-blue hover:underline">developer.riotgames.com</a>. Dev keys expire every 24 hours.
                     </p>
+                    <form id="inline-key-form" class="flex gap-2">
+                        <input type="text" id="inline-key-input" placeholder="RGAPI-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                               class="flex-1 bg-oracle-bg border border-oracle-border rounded px-3 py-1.5 text-oracle-light
+                                      placeholder-oracle-text/30 focus:border-oracle-gold focus:outline-none text-xs font-mono">
+                        <button type="submit"
+                                class="bg-oracle-gold/20 border border-oracle-gold text-oracle-gold px-3 py-1.5 rounded text-xs font-medium hover:bg-oracle-gold/30 transition-colors"
+                                id="inline-key-btn">Save</button>
+                    </form>
+                    <div id="inline-key-status" class="text-xs mt-1"></div>
                 </div>
             </div>
             {% endif %}
@@ -113,7 +121,7 @@
                 <input type="text" name="name" placeholder="Summoner Name"
                        class="flex-1 bg-oracle-bg border border-oracle-border rounded px-3 py-2 text-oracle-light
                               placeholder-oracle-text/50 focus:border-oracle-gold focus:outline-none text-sm">
-                <input type="text" name="tag" placeholder="Tag" value="LAN"
+                <input type="text" name="tag" placeholder="Tag" value="{{ summoner_tag or '' }}"
                        class="w-20 bg-oracle-bg border border-oracle-border rounded px-3 py-2 text-oracle-light
                               placeholder-oracle-text/50 focus:border-oracle-gold focus:outline-none text-sm">
                 <button type="submit"
@@ -252,6 +260,36 @@
         }
     }).catch(() => {});
 
+    // ─── Inline API Key ────────────────────────────────
+    const inlineKeyForm = document.getElementById('inline-key-form');
+    if (inlineKeyForm) {
+        inlineKeyForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const key = document.getElementById('inline-key-input').value.trim();
+            if (!key) return;
+            const btn = document.getElementById('inline-key-btn');
+            const status = document.getElementById('inline-key-status');
+            btn.textContent = 'Validating...'; btn.disabled = true;
+            try {
+                const r = await fetch('/api/settings/api-key', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ key }),
+                });
+                const d = await r.json();
+                if (d.valid) {
+                    status.innerHTML = '<span class="text-oracle-green">Key saved! Reloading...</span>';
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    status.innerHTML = `<span class="text-oracle-red">${d.error || 'Invalid key'}</span>`;
+                    btn.textContent = 'Save'; btn.disabled = false;
+                }
+            } catch {
+                status.innerHTML = '<span class="text-oracle-red">Failed to save</span>';
+                btn.textContent = 'Save'; btn.disabled = false;
+            }
+        });
+    }
+
     // ─── Champions ─────────────────────────────────────
     let allChampions = [];
 
@@ -321,19 +359,11 @@
         loading.style.display = 'none';
     });
 
-    // Poll game state — auto-redirect to in-game when game starts
+    // Poll game state for phase card display (redirect handled by base.html)
     function updateGameState() {
         fetch('/api/game-state')
             .then(r => r.json())
             .then(state => {
-                if (state.phase === 'in_game') {
-                    let s = {};
-                    try { s = JSON.parse(localStorage.getItem('oraclegg_settings')) || {}; } catch {}
-                    if (s.auto_redirect !== false) {
-                        window.location.href = '/in-game';
-                        return;
-                    }
-                }
                 const phaseText = document.getElementById('game-phase-text');
                 const phaseDetail = document.getElementById('game-phase-detail');
                 const phaseCard = document.getElementById('game-phase-card');

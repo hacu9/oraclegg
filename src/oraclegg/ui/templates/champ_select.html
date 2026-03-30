@@ -93,16 +93,7 @@
 </div>
 
 <script>
-    // Auto-redirect to in-game when game starts (respects settings)
-    setInterval(() => {
-        fetch('/api/game-state').then(r => r.json()).then(s => {
-            if (s.phase === 'in_game') {
-                let settings = {};
-                try { settings = JSON.parse(localStorage.getItem('oraclegg_settings')) || {}; } catch {}
-                if (settings.auto_redirect !== false) window.location.href = '/in-game';
-            }
-        }).catch(() => {});
-    }, 3000);
+    // Auto-redirect handled by base.html global state machine
 
     let champions = [];
 

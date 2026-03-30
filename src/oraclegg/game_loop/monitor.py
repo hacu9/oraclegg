@@ -550,6 +550,28 @@ async def _initialize_game(data: dict):
     your_champ = you.get("championName", "")
     your_position = POSITION_MAP.get(you.get("position", ""), "MID")
 
+    # Auto-detect summoner if not configured
+    if not settings.summoner_configured:
+        tag = you.get("riotIdTagLine", "")
+        if active_name and tag:
+            riot_id = f"{active_name}#{tag}"
+            settings.summoner_riot_id = riot_id
+            logger.info(f"Auto-detected summoner: {riot_id}")
+            # Persist to .env
+            try:
+                from pathlib import Path
+                import re
+                env_path = Path(".env")
+                if env_path.exists():
+                    content = env_path.read_text()
+                    if "SUMMONER_RIOT_ID=" in content:
+                        content = re.sub(r"SUMMONER_RIOT_ID=.*", f"SUMMONER_RIOT_ID={riot_id}", content)
+                    else:
+                        content += f"\nSUMMONER_RIOT_ID={riot_id}\n"
+                    env_path.write_text(content)
+            except Exception:
+                pass  # Best-effort save
+
     allies = [p for p in all_players if p.get("team") == your_team]
     enemies = [p for p in all_players if p.get("team") != your_team]
 

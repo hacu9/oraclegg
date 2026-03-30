@@ -91,8 +91,8 @@ def _derive_skill_max(data_list: list[dict]) -> str:
     max_order_counter = Counter()
 
     for d in data_list:
-        skill_order = d.get("skill_order", [])
-        if len(skill_order) < 9:  # Need at least 9 levels to determine max order
+        skill_order = d.get("skill_order") or []
+        if len(skill_order) < 9:
             continue
 
         # Count levels per skill at each point
@@ -121,7 +121,7 @@ def _derive_best_skill_order(data_list: list[dict]) -> list[str]:
     order_counter = Counter()
 
     for d in data_list:
-        skill_order = d.get("skill_order", [])
+        skill_order = d.get("skill_order") or []
         if len(skill_order) >= 15:  # Need substantial data
             key = tuple(skill_order[:18])
             order_counter[key] += (2 if d.get("win") else 1)

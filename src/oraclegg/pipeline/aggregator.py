@@ -262,7 +262,7 @@ async def load_champion_lookup() -> dict[int, dict]:
         }
 
 
-async def run_aggregation(min_sample_size: int = 30) -> dict:
+async def run_aggregation(min_sample_size: int = 30, current_patch_only: bool = True) -> dict:
     """Process cached matches into build aggregates.
 
     Groups by (champion, role, enemy_comp_archetype) and aggregates:
@@ -273,6 +273,19 @@ async def run_aggregation(min_sample_size: int = 30) -> dict:
     - Win rate
     """
     champion_lookup = await load_champion_lookup()
+
+    # Get current patch prefix for filtering
+    current_patch_prefix = ""
+    if current_patch_only:
+        try:
+            from oraclegg.static_data.manager import get_latest_patch
+            patch = await get_latest_patch()
+            # Match on major.minor (e.g. "16.6") not full version
+            parts = patch.split(".")
+            current_patch_prefix = f"{parts[0]}.{parts[1]}" if len(parts) >= 2 else patch
+            logger.info(f"Filtering to current patch: {current_patch_prefix}")
+        except Exception:
+            current_patch_only = False
 
     # Key: (champion_id, role, archetype)
     # Value: list of participant data dicts
@@ -307,6 +320,12 @@ async def run_aggregation(min_sample_size: int = 30) -> dict:
                     # Only ranked solo queue
                     if info.get("queueId") != 420:
                         continue
+
+                    # Filter to current patch only
+                    if current_patch_only and current_patch_prefix:
+                        game_version = info.get("gameVersion", "")
+                        if not game_version.startswith(current_patch_prefix):
+                            continue
 
                     for participant in info.get("participants", []):
                         pdata = extract_participant_data(match_data, participant)

@@ -707,7 +707,7 @@ def _reset_game_state():
 
 async def game_monitor_loop():
     """Background loop that polls for active games."""
-    global _tip_counter
+    global _tip_counter, _game_initialized, _scouting_task
     live_client = LiveClientAPI()
     poll_interval = settings.live_client_poll_interval
 
@@ -762,20 +762,20 @@ async def game_monitor_loop():
 
                 # Generate tips
                 new_tips = tip_engine.analyze(game_state)
+                
 
                 # Apply settings filter
                 try:
                     from oraclegg.api.routes import _tip_settings
                     cats = _tip_settings.get("categories", {})
-                    # min_priority: 2=all, 1=important+urgent, 0=urgent only
                     max_allowed = _tip_settings.get("min_priority", 2)
 
                     new_tips = [
                         t for t in new_tips
                         if cats.get(t.category, True) and t.priority <= max_allowed
                     ]
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Tip filter error (non-fatal): {e}")
 
                 if new_tips:
                     for t in new_tips:
@@ -819,7 +819,7 @@ async def game_monitor_loop():
                 game_state["phase"] = "idle"
 
         except Exception as e:
-            logger.debug(f"Monitor poll error: {e}")
+            logger.error(f"Monitor poll error: {e}", exc_info=True)
 
         await asyncio.sleep(poll_interval)
 

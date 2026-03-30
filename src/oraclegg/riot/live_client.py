@@ -36,14 +36,25 @@ def _detect_live_client_host() -> str:
 
 
 LIVE_CLIENT_HOST = _detect_live_client_host()
-LIVE_CLIENT_BASES = [
-    # WSL bridge (HTTP, no TLS) — preferred on WSL2
-    f"http://{LIVE_CLIENT_HOST}:29990",
-    "http://172.25.80.1:29990",
-    # Direct (works on native Windows/macOS)
-    f"https://{LIVE_CLIENT_HOST}:2999",
-    "https://127.0.0.1:2999",
-]
+
+# On WSL, try bridge first. On native Windows/macOS, go direct.
+_is_wsl = False
+try:
+    with open("/proc/version", "r") as f:
+        _is_wsl = "microsoft" in f.read().lower()
+except FileNotFoundError:
+    pass
+
+if _is_wsl:
+    LIVE_CLIENT_BASES = [
+        f"http://{LIVE_CLIENT_HOST}:29990",
+        "http://172.25.80.1:29990",
+        "https://127.0.0.1:2999",
+    ]
+else:
+    LIVE_CLIENT_BASES = [
+        "https://127.0.0.1:2999",
+    ]
 
 
 class LiveClientAPI:

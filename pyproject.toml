@@ -1,6 +1,6 @@
 [project]
 name = "oraclegg"
-version = "0.1.0"
+version = "0.2.0"
 description = "Real-time League of Legends coaching tool"
 requires-python = ">=3.11"
 dependencies = [
@@ -17,6 +17,7 @@ dependencies = [
     "alembic>=1.13.0",
     "python-multipart>=0.0.9",
     "pywebview>=6.1",
+    "anthropic>=0.40.0",
 ]
 
 [project.optional-dependencies]

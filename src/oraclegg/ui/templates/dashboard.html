@@ -12,6 +12,86 @@
         <p class="text-oracle-text mt-2">Real-time League of Legends coaching</p>
     </div>
 
+    <!-- Getting started banner -->
+    {% if not api_key_set or build_count == 0 %}
+    <div class="bg-oracle-card border border-oracle-gold/30 rounded-lg p-6 glow">
+        <h2 class="text-oracle-gold font-bold text-lg mb-3">Getting Started</h2>
+        <div class="space-y-3 text-sm">
+            {% if not api_key_set %}
+            <div class="flex items-start gap-3">
+                <span class="bg-oracle-red/20 text-oracle-red text-xs px-2 py-0.5 rounded-full border border-oracle-red/30 shrink-0 mt-0.5">REQUIRED</span>
+                <div class="flex-1">
+                    <span class="text-oracle-light font-medium">Set your Riot API key</span>
+                    <p class="text-oracle-text/60 text-xs mt-0.5 mb-2">
+                        Get a free key at <a href="https://developer.riotgames.com/" target="_blank" class="text-oracle-blue hover:underline">developer.riotgames.com</a>. Dev keys expire every 24 hours.
+                    </p>
+                    <form id="inline-key-form" class="flex gap-2">
+                        <input type="text" id="inline-key-input" placeholder="RGAPI-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                               class="flex-1 bg-oracle-bg border border-oracle-border rounded px-3 py-1.5 text-oracle-light
+                                      placeholder-oracle-text/30 focus:border-oracle-gold focus:outline-none text-xs font-mono">
+                        <button type="submit"
+                                class="bg-oracle-gold/20 border border-oracle-gold text-oracle-gold px-3 py-1.5 rounded text-xs font-medium hover:bg-oracle-gold/30 transition-colors"
+                                id="inline-key-btn">Save</button>
+                    </form>
+                    <div id="inline-key-status" class="text-xs mt-1"></div>
+                </div>
+            </div>
+            {% endif %}
+            {% if not summoner_set %}
+            <div class="flex items-start gap-3">
+                <span class="bg-oracle-gold/20 text-oracle-gold text-xs px-2 py-0.5 rounded-full border border-oracle-gold/30 shrink-0 mt-0.5">SETUP</span>
+                <div>
+                    <span class="text-oracle-light font-medium">Set your Summoner name</span>
+                    <p class="text-oracle-text/60 text-xs mt-0.5">
+                        Go to <a href="/settings" class="text-oracle-gold hover:underline">Settings</a> and enter your Riot ID (Name#Tag) for personal tracking.
+                    </p>
+                </div>
+            </div>
+            {% endif %}
+            {% if champion_count == 0 %}
+            <div class="flex items-start gap-3">
+                <span class="bg-oracle-red/20 text-oracle-red text-xs px-2 py-0.5 rounded-full border border-oracle-red/30 shrink-0 mt-0.5">REQUIRED</span>
+                <div>
+                    <span class="text-oracle-light font-medium">Seed champion &amp; item data</span>
+                    <p class="text-oracle-text/60 text-xs mt-0.5">
+                        Run: <code class="bg-oracle-bg px-1.5 py-0.5 rounded text-oracle-gold text-xs">uv run python scripts/seed_static_data.py</code>
+                    </p>
+                </div>
+            </div>
+            {% endif %}
+            {% if build_count == 0 and champion_count > 0 and api_key_set %}
+            <div class="flex items-start gap-3">
+                <span class="bg-oracle-blue/20 text-oracle-blue text-xs px-2 py-0.5 rounded-full border border-oracle-blue/30 shrink-0 mt-0.5">NEXT</span>
+                <div>
+                    <span class="text-oracle-light font-medium">Download build data from Master+ matches</span>
+                    <p class="text-oracle-text/60 text-xs mt-0.5 mb-2">
+                        This collects high-elo match data and generates build recommendations. Takes 2-5 minutes.
+                    </p>
+                    <button onclick="runPipeline()" id="pipeline-btn"
+                        class="bg-oracle-blue/20 border border-oracle-blue text-oracle-blue px-4 py-1.5 rounded text-xs font-medium hover:bg-oracle-blue/30 transition-colors">
+                        Download Build Data
+                    </button>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Pipeline status (always visible when running) -->
+    <div id="pipeline-status" style="display:none" class="bg-oracle-card border border-oracle-blue/30 rounded-lg p-4">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-4 h-4 border-2 border-oracle-blue border-t-transparent rounded-full animate-spin" id="pipeline-spinner"></div>
+                <div>
+                    <span class="text-oracle-light text-sm font-medium" id="pipeline-status-text">Running pipeline...</span>
+                    <span class="text-oracle-text/50 text-xs block" id="pipeline-progress-text"></span>
+                </div>
+            </div>
+            <span class="text-oracle-blue text-xs" id="pipeline-phase">collecting</span>
+        </div>
+    </div>
+
     <!-- Stats cards -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div class="bg-oracle-card border border-oracle-border rounded-lg p-6 glow">
@@ -37,11 +117,11 @@
         <div class="bg-oracle-card border border-oracle-border rounded-lg p-6 card-hover">
             <h2 class="text-oracle-light font-semibold mb-4">Scout a Player</h2>
             <form hx-get="/api/scout/html" hx-target="#scout-result" hx-indicator="#scout-loading"
-                  class="flex gap-2">
+                  hx-disabled-elt="find button" class="flex gap-2">
                 <input type="text" name="name" placeholder="Summoner Name"
                        class="flex-1 bg-oracle-bg border border-oracle-border rounded px-3 py-2 text-oracle-light
                               placeholder-oracle-text/50 focus:border-oracle-gold focus:outline-none text-sm">
-                <input type="text" name="tag" placeholder="Tag" value="LAN"
+                <input type="text" name="tag" placeholder="Tag" value="{{ summoner_tag or '' }}"
                        class="w-20 bg-oracle-bg border border-oracle-border rounded px-3 py-2 text-oracle-light
                               placeholder-oracle-text/50 focus:border-oracle-gold focus:outline-none text-sm">
                 <button type="submit"
@@ -59,15 +139,14 @@
         <!-- Get a build -->
         <div class="bg-oracle-card border border-oracle-border rounded-lg p-6 card-hover">
             <h2 class="text-oracle-light font-semibold mb-4">Get Build Recommendation</h2>
-            <form hx-get="/api/recommend/html" hx-target="#build-result" hx-indicator="#build-loading"
-                  class="space-y-3">
+            <form id="build-form" class="space-y-3">
                 <div class="flex gap-2">
                     <select name="champion_id" id="champ-select"
                             class="flex-1 bg-oracle-bg border border-oracle-border rounded px-3 py-2 text-oracle-light
                                    focus:border-oracle-gold focus:outline-none text-sm">
                         <option value="">Loading champions...</option>
                     </select>
-                    <select name="role"
+                    <select name="role" id="role-select"
                             class="w-32 bg-oracle-bg border border-oracle-border rounded px-3 py-2 text-oracle-light
                                    focus:border-oracle-gold focus:outline-none text-sm">
                         <option value="TOP">Top</option>
@@ -78,18 +157,37 @@
                     </select>
                 </div>
                 <div>
-                    <input type="text" name="enemy_ids" placeholder="Enemy champ IDs (e.g., 86,238,64,222,412)"
-                           class="w-full bg-oracle-bg border border-oracle-border rounded px-3 py-2 text-oracle-light
-                                  placeholder-oracle-text/50 focus:border-oracle-gold focus:outline-none text-sm">
-                    <p class="text-oracle-text/50 text-xs mt-1">Leave empty for general build</p>
+                    <label class="text-oracle-text text-xs block mb-1">Enemy Champions (optional)</label>
+                    <div class="grid grid-cols-5 gap-1.5">
+                        <select class="enemy-select bg-oracle-bg border border-oracle-border rounded px-2 py-1.5
+                                    text-oracle-light focus:border-oracle-red focus:outline-none text-xs">
+                            <option value="">Top</option>
+                        </select>
+                        <select class="enemy-select bg-oracle-bg border border-oracle-border rounded px-2 py-1.5
+                                    text-oracle-light focus:border-oracle-red focus:outline-none text-xs">
+                            <option value="">Jgl</option>
+                        </select>
+                        <select class="enemy-select bg-oracle-bg border border-oracle-border rounded px-2 py-1.5
+                                    text-oracle-light focus:border-oracle-red focus:outline-none text-xs">
+                            <option value="">Mid</option>
+                        </select>
+                        <select class="enemy-select bg-oracle-bg border border-oracle-border rounded px-2 py-1.5
+                                    text-oracle-light focus:border-oracle-red focus:outline-none text-xs">
+                            <option value="">ADC</option>
+                        </select>
+                        <select class="enemy-select bg-oracle-bg border border-oracle-border rounded px-2 py-1.5
+                                    text-oracle-light focus:border-oracle-red focus:outline-none text-xs">
+                            <option value="">Sup</option>
+                        </select>
+                    </div>
                 </div>
                 <button type="submit"
                         class="w-full bg-oracle-blue/20 border border-oracle-blue text-oracle-blue px-4 py-2 rounded
-                               hover:bg-oracle-blue/30 transition-colors text-sm font-medium">
+                               hover:bg-oracle-blue/30 transition-colors text-sm font-medium" id="build-btn">
                     Get Build
                 </button>
             </form>
-            <div id="build-loading" class="htmx-indicator mt-4 text-oracle-text text-sm">
+            <div id="build-loading" class="mt-4 text-oracle-text text-sm" style="display:none">
                 Loading recommendation...
             </div>
             <div id="build-result" class="mt-4"></div>
@@ -105,10 +203,102 @@
 </div>
 
 <script>
-    // Load champion list into dropdown
+    // ─── Pipeline ──────────────────────────────────────
+    async function runPipeline() {
+        const btn = document.getElementById('pipeline-btn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Starting...'; }
+        try {
+            const r = await fetch('/api/pipeline/run', { method: 'POST' });
+            const d = await r.json();
+            if (d.error) { alert(d.error); if (btn) { btn.disabled = false; btn.textContent = 'Download Build Data'; } return; }
+            pollPipeline();
+        } catch(e) { if (btn) { btn.disabled = false; btn.textContent = 'Download Build Data'; } }
+    }
+
+    function pollPipeline() {
+        const statusDiv = document.getElementById('pipeline-status');
+        const statusText = document.getElementById('pipeline-status-text');
+        const progressText = document.getElementById('pipeline-progress-text');
+        const phaseEl = document.getElementById('pipeline-phase');
+        const spinner = document.getElementById('pipeline-spinner');
+
+        function check() {
+            fetch('/api/pipeline/status').then(r => r.json()).then(s => {
+                if (s.running || s.status === 'collecting' || s.status === 'aggregating') {
+                    statusDiv.style.display = 'block';
+                    statusText.textContent = s.progress || 'Running...';
+                    phaseEl.textContent = s.status;
+                    spinner.style.display = 'block';
+                    setTimeout(check, 2000);
+                } else if (s.status === 'complete') {
+                    statusDiv.style.display = 'block';
+                    statusText.textContent = s.progress || 'Pipeline complete!';
+                    phaseEl.textContent = 'done';
+                    spinner.style.display = 'none';
+                    progressText.textContent = 'Reload the page to see updated data.';
+                    // Auto-reload after 2s
+                    setTimeout(() => location.reload(), 2500);
+                } else if (s.status === 'error') {
+                    statusDiv.style.display = 'block';
+                    statusText.textContent = 'Pipeline failed: ' + (s.error || 'Unknown error');
+                    phaseEl.textContent = 'error';
+                    spinner.style.display = 'none';
+                    const btn = document.getElementById('pipeline-btn');
+                    if (btn) { btn.disabled = false; btn.textContent = 'Retry'; }
+                } else {
+                    statusDiv.style.display = 'none';
+                }
+            }).catch(() => { setTimeout(check, 3000); });
+        }
+        check();
+    }
+
+    // Check if pipeline is already running on page load
+    fetch('/api/pipeline/status').then(r => r.json()).then(s => {
+        if (s.running || s.status === 'collecting' || s.status === 'aggregating') {
+            pollPipeline();
+        }
+    }).catch(() => {});
+
+    // ─── Inline API Key ────────────────────────────────
+    const inlineKeyForm = document.getElementById('inline-key-form');
+    if (inlineKeyForm) {
+        inlineKeyForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const key = document.getElementById('inline-key-input').value.trim();
+            if (!key) return;
+            const btn = document.getElementById('inline-key-btn');
+            const status = document.getElementById('inline-key-status');
+            btn.textContent = 'Validating...'; btn.disabled = true;
+            try {
+                const r = await fetch('/api/settings/api-key', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ key }),
+                });
+                const d = await r.json();
+                if (d.valid) {
+                    status.innerHTML = '<span class="text-oracle-green">Key saved! Reloading...</span>';
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    status.innerHTML = `<span class="text-oracle-red">${d.error || 'Invalid key'}</span>`;
+                    btn.textContent = 'Save'; btn.disabled = false;
+                }
+            } catch {
+                status.innerHTML = '<span class="text-oracle-red">Failed to save</span>';
+                btn.textContent = 'Save'; btn.disabled = false;
+            }
+        });
+    }
+
+    // ─── Champions ─────────────────────────────────────
+    let allChampions = [];
+
+    // Load champion list into all dropdowns
     fetch('/api/champions')
         .then(r => r.json())
         .then(champs => {
+            allChampions = champs;
+            // Populate main champion select
             const sel = document.getElementById('champ-select');
             sel.innerHTML = '<option value="">Select Champion</option>';
             champs.forEach(c => {
@@ -117,21 +307,63 @@
                 opt.textContent = c.name;
                 sel.appendChild(opt);
             });
+
+            // Populate enemy selects
+            document.querySelectorAll('.enemy-select').forEach(sel => {
+                const placeholder = sel.options[0].textContent;
+                const first = document.createElement('option');
+                first.value = '';
+                first.textContent = placeholder;
+                sel.innerHTML = '';
+                sel.appendChild(first);
+                champs.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.textContent = c.name;
+                    sel.appendChild(opt);
+                });
+            });
         });
 
-    // Poll game state every 3 seconds — auto-redirect to in-game when game starts
+    // Build form submission
+    document.getElementById('build-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const champId = document.getElementById('champ-select').value;
+        const role = document.getElementById('role-select').value;
+        if (!champId) { alert('Select your champion'); return; }
+
+        const enemyIds = Array.from(document.querySelectorAll('.enemy-select'))
+            .map(s => s.value)
+            .filter(v => v);
+
+        const btn = document.getElementById('build-btn');
+        const loading = document.getElementById('build-loading');
+        btn.disabled = true;
+        btn.textContent = 'Loading...';
+        loading.style.display = 'block';
+
+        try {
+            const params = new URLSearchParams({
+                champion_id: champId,
+                role: role,
+                enemy_ids: enemyIds.join(','),
+            });
+            const resp = await fetch(`/api/recommend/html?${params}`);
+            document.getElementById('build-result').innerHTML = await resp.text();
+        } catch(e) {
+            document.getElementById('build-result').innerHTML =
+                '<div class="text-oracle-red text-sm">Failed to load build. Check your connection.</div>';
+        }
+        btn.disabled = false;
+        btn.textContent = 'Get Build';
+        loading.style.display = 'none';
+    });
+
+    // Poll game state for phase card display (redirect handled by base.html)
     function updateGameState() {
         fetch('/api/game-state')
             .then(r => r.json())
             .then(state => {
-                if (state.phase === 'in_game') {
-                    let s = {};
-                    try { s = JSON.parse(localStorage.getItem('oraclegg_settings')) || {}; } catch {}
-                    if (s.auto_redirect !== false) {
-                        window.location.href = '/in-game';
-                        return;
-                    }
-                }
                 const phaseText = document.getElementById('game-phase-text');
                 const phaseDetail = document.getElementById('game-phase-detail');
                 const phaseCard = document.getElementById('game-phase-card');

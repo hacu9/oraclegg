@@ -10,21 +10,12 @@ import logging
 from sqlalchemy import select
 
 from oraclegg.config import settings
+from oraclegg.constants import ROLE_MAP
 from oraclegg.db.engine import async_session
 from oraclegg.db.models import MatchHistoryCache
 from oraclegg.riot.client import RiotClient, RiotAPIError
 
 logger = logging.getLogger(__name__)
-
-# Role normalization: Riot uses MIDDLE/BOTTOM/UTILITY, we use MID/ADC/SUPPORT
-ROLE_MAP = {
-    "TOP": "TOP",
-    "JUNGLE": "JUNGLE",
-    "MIDDLE": "MID",
-    "BOTTOM": "ADC",
-    "UTILITY": "SUPPORT",
-    "": "UNKNOWN",
-}
 
 
 async def collect_high_elo_puuids(
@@ -88,10 +79,15 @@ async def collect_match_ids(
                 puuid, queue=420, count=matches_per_player
             )
             all_match_ids.update(match_ids)
-        except RiotAPIError:
+        except RiotAPIError as e:
             errors += 1
-            if errors > 100:
-                logger.warning("Too many errors fetching match IDs, stopping")
+            if e.status_code in (401, 403):
+                logger.error("API key invalid or expired. Stopping.")
+                break
+            if e.status_code == 429:
+                await asyncio.sleep(15)
+            if errors > 30:
+                logger.warning(f"Too many errors ({errors}), stopping match ID collection")
                 break
 
         if (i + 1) % 50 == 0:
@@ -141,9 +137,13 @@ async def fetch_and_cache_matches(
         except RiotAPIError as e:
             errors += 1
             if e.status_code == 429:
-                await asyncio.sleep(10)
-            if errors > 200:
-                logger.warning("Too many errors fetching matches, stopping")
+                logger.info("Rate limited — waiting 30s before retrying")
+                await asyncio.sleep(30)
+            elif e.status_code in (401, 403):
+                logger.error("API key invalid or expired. Stopping.")
+                break
+            if errors > 50:
+                logger.warning(f"Too many errors ({errors}), stopping collection early")
                 break
 
         if (i + 1) % 25 == 0:

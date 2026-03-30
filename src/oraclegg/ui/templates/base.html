@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}OracleGG{% endblock %}</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <script>
@@ -39,7 +40,6 @@
         .htmx-indicator { display: none; }
         .htmx-request .htmx-indicator { display: inline-block; }
         .htmx-request.htmx-indicator { display: inline-block; }
-        /* Scrollbar */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #131920; }
         ::-webkit-scrollbar-thumb { background: #1e2a36; border-radius: 3px; }
@@ -54,12 +54,18 @@
                 <span class="text-oracle-gold font-bold text-xl tracking-wide">ORACLE</span>
                 <span class="text-oracle-blue font-light text-xl">.GG</span>
             </a>
-            <div class="flex gap-6 text-sm">
+            <div class="flex items-center gap-6 text-sm">
                 <a href="/" class="hover:text-oracle-light transition-colors {% block nav_dashboard %}{% endblock %}">Dashboard</a>
                 <a href="/champ-select" class="hover:text-oracle-light transition-colors {% block nav_champ_select %}{% endblock %}">Champ Select</a>
                 <a href="/in-game" class="hover:text-oracle-light transition-colors {% block nav_in_game %}{% endblock %}">In-Game</a>
                 <a href="/tracking" class="hover:text-oracle-light transition-colors {% block nav_tracking %}{% endblock %}">Tracking</a>
                 <a href="/settings" class="hover:text-oracle-light transition-colors {% block nav_settings %}{% endblock %}">Settings</a>
+                <!-- Live match indicator -->
+                <a href="/in-game" id="live-indicator" style="display:none"
+                   class="flex items-center gap-1.5 bg-oracle-red/20 border border-oracle-red/40 text-oracle-red px-3 py-1 rounded-full text-xs font-bold ml-2 animate-pulse">
+                    <span class="w-2 h-2 rounded-full bg-oracle-red"></span>
+                    LIVE
+                </a>
             </div>
         </div>
     </nav>
@@ -87,7 +93,74 @@
     </main>
 
     <script>
-    // Check for updates on page load
+    // ─── Global State Machine ────────────────────────────────────────
+    // Handles auto-navigation from ANY page based on game phase.
+    // Individual pages opt out by setting window._oracleNoAutoNav = true.
+
+    let _lastPhase = null;
+    let _postGameTimer = null;
+
+    function _getCurrentPage() {
+        const path = window.location.pathname;
+        if (path === '/in-game') return 'in-game';
+        if (path === '/tracking') return 'tracking';
+        if (path === '/champ-select') return 'champ-select';
+        if (path === '/settings') return 'settings';
+        return 'dashboard';
+    }
+
+    function _globalStateCheck() {
+        fetch('/api/game-state').then(r=>r.json()).then(s => {
+            const phase = s.phase;
+            const page = _getCurrentPage();
+            const el = document.getElementById('live-indicator');
+
+            // Update live indicator
+            if (el) el.style.display = phase === 'in_game' ? 'flex' : 'none';
+
+            // Check auto_redirect setting
+            let autoRedirect = true;
+            try {
+                const prefs = JSON.parse(localStorage.getItem('oraclegg_settings'));
+                if (prefs && prefs.auto_redirect === false) autoRedirect = false;
+            } catch {}
+
+            // Skip if page opts out
+            if (window._oracleNoAutoNav) {
+                _lastPhase = phase;
+                return;
+            }
+
+            if (autoRedirect) {
+                // Game started → go to in-game (from any page)
+                if (phase === 'in_game' && page !== 'in-game') {
+                    window.location.href = '/in-game';
+                    return;
+                }
+
+                // Game ended → go to tracking after 8s (if we were in-game)
+                if (phase === 'post_game' && _lastPhase === 'in_game' && page === 'in-game') {
+                    if (!_postGameTimer) {
+                        _postGameTimer = setTimeout(() => {
+                            window.location.href = '/tracking';
+                        }, 8000);
+                    }
+                }
+
+                // Back to idle after post-game (clear timer)
+                if (phase === 'idle' && _lastPhase === 'post_game') {
+                    if (_postGameTimer) { clearTimeout(_postGameTimer); _postGameTimer = null; }
+                }
+            }
+
+            _lastPhase = phase;
+        }).catch(()=>{});
+    }
+
+    _globalStateCheck();
+    setInterval(_globalStateCheck, 3000);
+
+    // ─── Updates ─────────────────────────────────────────────────────
     fetch('/api/update/check').then(r=>r.json()).then(d=>{
         if(d.available && d.url){
             document.getElementById('update-version').textContent = d.version;

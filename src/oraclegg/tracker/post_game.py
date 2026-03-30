@@ -24,6 +24,9 @@ async def analyze_post_game(client: RiotClient) -> dict | None:
     """
     try:
         # Get our account
+        if not settings.summoner_configured:
+            logger.warning("Summoner not configured — skipping post-game analysis")
+            return None
         name, tag = settings.summoner_riot_id.split("#")
         account = await client.get_account_by_riot_id(name, tag)
         puuid = account.puuid
@@ -67,14 +70,10 @@ async def analyze_post_game(client: RiotClient) -> dict | None:
             if getattr(me, f"item{i}", 0) > 0
         ]
 
+        my_team_id = me.teamId
         enemy_ids = [
             p.championId for p in info.participants
-            if p.puuid != puuid and (
-                # Different team — infer from participant index
-                info.participants.index(p) >= 5
-                if info.participants.index(me) < 5
-                else info.participants.index(p) < 5
-            )
+            if p.puuid != puuid and p.teamId != my_team_id
         ]
 
         # Get champion name

@@ -1,6 +1,7 @@
 """PyInstaller entry point for OracleGG.
 
-Bundled into the .exe. Handles first-run setup, starts server, opens browser.
+Bundled into the .exe. Starts server, opens browser/native window.
+First-run setup (seeding, pipeline) is handled automatically by the server.
 """
 
 import multiprocessing
@@ -17,35 +18,16 @@ def get_app_dir():
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-def first_run_setup(app_dir):
-    """Check if first run — seed static data and create .env."""
-    db_path = os.path.join(app_dir, "data", "oraclegg.db")
+def ensure_env(app_dir):
+    """Create .env from template if it doesn't exist."""
     env_path = os.path.join(app_dir, ".env")
     env_example = os.path.join(app_dir, ".env.example")
 
-    # Check .env
-    if not os.path.exists(env_path):
-        if os.path.exists(env_example):
-            import shutil
-            shutil.copy(env_example, env_path)
-            print("  [!] Created .env from template.")
-            print("  [!] Edit .env and set your RIOT_API_KEY before using.")
-            print("      Get one at: https://developer.riotgames.com/")
-            print()
-
-    # Check if DB needs seeding
-    if not os.path.exists(db_path):
-        print("  [..] First run — downloading champion and item data...")
-        try:
-            import asyncio
-            from oraclegg.db.engine import init_db
-            from oraclegg.static_data.manager import seed_all
-            asyncio.run(init_db())
-            asyncio.run(seed_all())
-            print("  [OK] Data ready.")
-        except Exception as e:
-            print(f"  [!] Data seed failed: {e}")
-            print("      You can run this manually later.")
+    if not os.path.exists(env_path) and os.path.exists(env_example):
+        import shutil
+        shutil.copy(env_example, env_path)
+        print("  Created .env from template.")
+        print("  Set your Riot API key in Settings after the app opens.")
         print()
 
 
@@ -64,7 +46,7 @@ def enable_live_client_api():
                     content = content.replace("[General]", "[General]\nEnableReplayApi=1", 1)
                     with open(cfg, "w") as f:
                         f.write(content)
-                    print("  [OK] Enabled Live Client Data API in League config.")
+                    print("  Enabled Live Client Data API in League config.")
             except Exception:
                 pass
 
@@ -91,20 +73,19 @@ def main():
     os.chdir(app_dir)
     os.environ.setdefault("DB_PATH", os.path.join(app_dir, "data", "oraclegg.db"))
 
-    # First run setup
-    first_run_setup(app_dir)
+    ensure_env(app_dir)
     enable_live_client_api()
 
-    # Start server
+    # Start server (auto-seeds DB and auto-runs pipeline on first run)
     print("  Starting server...")
     server = multiprocessing.Process(target=run_server, args=(port, app_dir), daemon=True)
     server.start()
 
-    # Wait for server
+    # Wait for server to be ready
     import httpx
-    for _ in range(40):
+    for _ in range(60):  # Up to 30s (first run seeds data)
         try:
-            httpx.get(f"http://127.0.0.1:{port}/api/stats", timeout=1)
+            httpx.get(f"http://127.0.0.1:{port}/api/version", timeout=1)
             break
         except Exception:
             time.sleep(0.5)
@@ -119,10 +100,10 @@ def main():
         print("  Opening native window...")
         webview.create_window(
             title="OracleGG",
-            url=f"{url}/in-game",
-            width=960,
-            height=750,
-            min_size=(700, 500),
+            url=url,
+            width=1100,
+            height=800,
+            min_size=(800, 600),
             on_top=True,
             text_select=False,
         )

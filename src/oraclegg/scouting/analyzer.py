@@ -27,7 +27,9 @@ def analyze_tendencies(
     total = len(recent_matches)
 
     # Champion pool analysis
-    champ_counter = Counter(m.get("champion_id") for m in recent_matches)
+    champ_counter = Counter(m.get("champion_id") for m in recent_matches if m.get("champion_id"))
+    if not champ_counter:
+        return {"no_data": True}
     most_played_id, most_played_count = champ_counter.most_common(1)[0]
 
     # One-trick: >60% of games on 1-2 champions

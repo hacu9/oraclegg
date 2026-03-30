@@ -153,3 +153,15 @@ class UserSetting(Base):
 
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
     value: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class Rune(Base):
+    __tablename__ = "runes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)  # Riot rune/perk ID
+    name: Mapped[str] = mapped_column(String(64), nullable=False)
+    tree_id: Mapped[int] = mapped_column(Integer, nullable=False)  # Parent tree ID
+    tree_name: Mapped[str] = mapped_column(String(32), nullable=False)
+    slot: Mapped[int] = mapped_column(Integer, nullable=False)  # 0=keystone, 1-3=rows
+    icon: Mapped[str] = mapped_column(String(256), nullable=False, default="")
+    patch: Mapped[str] = mapped_column(String(16), nullable=False)

@@ -3,8 +3,8 @@
 Analyzes live game state and generates actionable coaching tips.
 """
 
-import time
 from dataclasses import dataclass, field
+from time import time
 
 SUMMONER_SPELL_NAMES = {
     1: "Cleanse", 3: "Exhaust", 4: "Flash", 6: "Ghost", 7: "Heal",
@@ -59,7 +59,7 @@ class Tip:
     priority: int  # 0=urgent, 1=important, 2=info
     category: str  # "item", "objective", "threat", "strategy", "build"
     message: str
-    timestamp: float = field(default_factory=time.time)
+    timestamp: float = field(default_factory=time)
 
 
 class TipEngine:
@@ -119,7 +119,7 @@ class TipEngine:
         # Filter out already-given one-time tips
         filtered = []
         for t in tips:
-            key = f"{t.category}:{t.message[:50]}"
+            key = f"{t.category}:{hash(t.message)}"
             if key not in self._game_tips_given:
                 filtered.append(t)
                 self._game_tips_given.add(key)

@@ -75,13 +75,13 @@
         <p class="text-oracle-text/60 text-sm mb-4">Only show tips at or above this priority level.</p>
 
         <div class="flex gap-3">
-            <button class="prio-btn px-4 py-2 rounded border text-sm font-medium transition-colors" data-prio="0">
+            <button class="prio-btn px-4 py-2 rounded border text-sm font-medium transition-colors" data-prio="all">
                 All Tips
             </button>
-            <button class="prio-btn px-4 py-2 rounded border text-sm font-medium transition-colors" data-prio="1">
+            <button class="prio-btn px-4 py-2 rounded border text-sm font-medium transition-colors" data-prio="important">
                 Important + Urgent
             </button>
-            <button class="prio-btn px-4 py-2 rounded border text-sm font-medium transition-colors" data-prio="0">
+            <button class="prio-btn px-4 py-2 rounded border text-sm font-medium transition-colors" data-prio="urgent">
                 Urgent Only
             </button>
         </div>
@@ -105,6 +105,24 @@
         <div id="key-status" class="text-xs mt-2"></div>
     </div>
 
+    <!-- Claude API Key (optional) -->
+    <div class="bg-oracle-card border border-oracle-border rounded-lg p-6">
+        <h2 class="text-oracle-light font-semibold mb-2">AI Coaching <span class="text-oracle-text/40 text-xs font-normal ml-1">optional</span></h2>
+        <p class="text-oracle-text/60 text-sm mb-4">Add a Claude API key for AI-powered post-game analysis with personalized coaching insights. Get one at <a href="https://console.anthropic.com/" target="_blank" class="text-oracle-blue hover:underline">console.anthropic.com</a>.</p>
+
+        <form id="claude-key-form" class="flex gap-2">
+            <input type="text" id="claude-key-input" placeholder="sk-ant-api03-..."
+                   class="flex-1 bg-oracle-bg border border-oracle-border rounded px-3 py-2 text-oracle-light
+                          placeholder-oracle-text/30 focus:border-oracle-gold focus:outline-none text-sm font-mono">
+            <button type="submit"
+                    class="bg-oracle-purple/20 border border-oracle-purple text-oracle-purple px-4 py-2 rounded
+                           hover:bg-oracle-purple/30 transition-colors text-sm font-medium" id="save-claude-btn">
+                Save
+            </button>
+        </form>
+        <div id="claude-key-status" class="text-xs mt-2"></div>
+    </div>
+
     <!-- Summoner -->
     <div class="bg-oracle-card border border-oracle-border rounded-lg p-6">
         <h2 class="text-oracle-light font-semibold mb-2">Summoner</h2>
@@ -124,6 +142,56 @@
             </button>
         </form>
         <div id="summoner-status" class="text-xs mt-2"></div>
+    </div>
+
+    <!-- Data Pipeline -->
+    <div class="bg-oracle-card border border-oracle-border rounded-lg p-6">
+        <h2 class="text-oracle-light font-semibold mb-2">Build Data</h2>
+        <p class="text-oracle-text/60 text-sm mb-4">Download Master+ match data and generate build recommendations. Requires a valid API key.</p>
+
+        <div class="flex items-center gap-3">
+            <button onclick="runPipelineFromSettings()" id="settings-pipeline-btn"
+                class="bg-oracle-blue/20 border border-oracle-blue text-oracle-blue px-4 py-2 rounded text-sm font-medium hover:bg-oracle-blue/30 transition-colors">
+                Download Build Data
+            </button>
+            <span id="settings-pipeline-status" class="text-oracle-text/60 text-xs"></span>
+        </div>
+    </div>
+
+    <!-- Region -->
+    <div class="bg-oracle-card border border-oracle-border rounded-lg p-6">
+        <h2 class="text-oracle-light font-semibold mb-2">Region</h2>
+        <p class="text-oracle-text/60 text-sm mb-4">Select your server region. Changes are saved to .env and take effect on restart.</p>
+
+        <form id="region-form" class="flex gap-2 items-end">
+            <div class="flex-1">
+                <label class="text-oracle-text text-xs block mb-1">Platform</label>
+                <select id="region-platform"
+                        class="w-full bg-oracle-bg border border-oracle-border rounded px-3 py-2 text-oracle-light focus:border-oracle-gold focus:outline-none text-sm">
+                    <option value="na1">NA (North America)</option>
+                    <option value="euw1">EUW (Europe West)</option>
+                    <option value="eun1">EUNE (Europe Nordic & East)</option>
+                    <option value="kr">KR (Korea)</option>
+                    <option value="jp1">JP (Japan)</option>
+                    <option value="br1">BR (Brazil)</option>
+                    <option value="la1">LAN (Latin America North)</option>
+                    <option value="la2">LAS (Latin America South)</option>
+                    <option value="oc1">OCE (Oceania)</option>
+                    <option value="tr1">TR (Turkey)</option>
+                    <option value="ru">RU (Russia)</option>
+                    <option value="ph2">PH (Philippines)</option>
+                    <option value="sg2">SG (Singapore)</option>
+                    <option value="th2">TH (Thailand)</option>
+                    <option value="tw2">TW (Taiwan)</option>
+                    <option value="vn2">VN (Vietnam)</option>
+                </select>
+            </div>
+            <button type="submit"
+                    class="bg-oracle-gold/20 border border-oracle-gold text-oracle-gold px-4 py-2 rounded text-sm font-medium hover:bg-oracle-gold/30 transition-colors">
+                Save
+            </button>
+        </form>
+        <div id="region-status" class="text-xs mt-2"></div>
     </div>
 
     <!-- General -->
@@ -170,7 +238,67 @@ input:checked + .slider:before { transform: translateX(20px); background: #c89b3
 </style>
 
 <script>
-// Load current API key status
+// Load current account/region settings
+fetch('/api/settings/account').then(r => r.json()).then(d => {
+    // Set region dropdown
+    const platformSel = document.getElementById('region-platform');
+    if (platformSel && d.platform) {
+        platformSel.value = d.platform;
+    }
+}).catch(() => {});
+
+// Save region
+document.getElementById('region-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const platform = document.getElementById('region-platform').value;
+    try {
+        const r = await fetch('/api/settings/region', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ platform }),
+        });
+        const d = await r.json();
+        if (d.ok) {
+            document.getElementById('region-status').innerHTML =
+                `<span class="text-oracle-green">Saved: ${platform} (${d.region})</span>`;
+        } else {
+            document.getElementById('region-status').innerHTML =
+                `<span class="text-oracle-red">${d.error}</span>`;
+        }
+    } catch {
+        document.getElementById('region-status').innerHTML =
+            '<span class="text-oracle-red">Failed to save</span>';
+    }
+});
+
+// Claude API key
+document.getElementById('claude-key-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const key = document.getElementById('claude-key-input').value.trim();
+    const btn = document.getElementById('save-claude-btn');
+    const status = document.getElementById('claude-key-status');
+    btn.textContent = 'Saving...';
+    try {
+        const r = await fetch('/api/settings/claude-key', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ key }),
+        });
+        const d = await r.json();
+        if (d.ok) {
+            status.innerHTML = key
+                ? '<span class="text-oracle-green">Saved. AI coaching is now enabled for post-game analysis.</span>'
+                : '<span class="text-oracle-text/50">AI coaching disabled.</span>';
+            document.getElementById('claude-key-input').value = '';
+        }
+    } catch { status.innerHTML = '<span class="text-oracle-red">Failed to save.</span>'; }
+    btn.textContent = 'Save';
+});
+
+// Check if Claude key is set
+fetch('/api/settings/account').then(r => r.json()).then(d => {
+    // The account endpoint doesn't include Claude key status yet, but that's OK
+}).catch(() => {});
+
+// Load API key status
 fetch('/api/settings/account').then(r => r.json()).then(d => {
     if (d.api_key_set) {
         document.getElementById('key-status').innerHTML = '<span class="text-oracle-green">Key is set. ' + (d.api_key_preview || '') + '</span>';
@@ -284,29 +412,66 @@ document.querySelectorAll('[data-setting]').forEach(cb => {
 });
 
 // Priority buttons
-document.querySelectorAll('.prio-btn').forEach((btn, i) => {
-    const vals = [0, 1, 0]; // All, Important+, Urgent
-    const labels = ['all', 'important', 'urgent'];
-    if (i === 0 && settings.min_priority === 0) btn.classList.add('active');
-    if (i === 1 && settings.min_priority === 1) btn.classList.add('active');
-    if (i === 2 && settings.min_priority === 0 && settings.urgent_only) btn.classList.add('active');
+document.querySelectorAll('.prio-btn').forEach(btn => {
+    const mode = btn.dataset.prio;
+
+    // Set initial active state
+    if (mode === 'urgent' && settings.urgent_only) btn.classList.add('active');
+    else if (mode === 'important' && settings.min_priority === 1 && !settings.urgent_only) btn.classList.add('active');
+    else if (mode === 'all' && settings.min_priority === 0 && !settings.urgent_only) btn.classList.add('active');
 
     btn.addEventListener('click', () => {
         document.querySelectorAll('.prio-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        if (i === 2) {
+        if (mode === 'urgent') {
             settings.min_priority = 0;
             settings.urgent_only = true;
+        } else if (mode === 'important') {
+            settings.min_priority = 1;
+            settings.urgent_only = false;
         } else {
-            settings.min_priority = vals[i];
+            settings.min_priority = 0;
             settings.urgent_only = false;
         }
         saveSettings(settings);
     });
 });
 
-// Set initial active state
-const activePrio = settings.urgent_only ? 2 : (settings.min_priority === 1 ? 1 : 0);
-document.querySelectorAll('.prio-btn')[activePrio]?.classList.add('active');
+// Pipeline
+async function runPipelineFromSettings() {
+    const btn = document.getElementById('settings-pipeline-btn');
+    const status = document.getElementById('settings-pipeline-status');
+    btn.disabled = true; btn.textContent = 'Starting...';
+    try {
+        const r = await fetch('/api/pipeline/run', { method: 'POST' });
+        const d = await r.json();
+        if (d.error) { status.textContent = d.error; btn.disabled = false; btn.textContent = 'Download Build Data'; return; }
+        status.textContent = 'Pipeline started...';
+        pollSettingsPipeline();
+    } catch(e) { btn.disabled = false; btn.textContent = 'Download Build Data'; status.textContent = 'Failed to start'; }
+}
+
+function pollSettingsPipeline() {
+    const btn = document.getElementById('settings-pipeline-btn');
+    const status = document.getElementById('settings-pipeline-status');
+    function check() {
+        fetch('/api/pipeline/status').then(r => r.json()).then(s => {
+            status.textContent = s.progress || s.status;
+            if (s.running) { setTimeout(check, 2000); }
+            else if (s.status === 'complete') { btn.textContent = 'Done!'; status.className = 'text-oracle-green text-xs'; }
+            else if (s.status === 'error') { btn.disabled = false; btn.textContent = 'Retry'; status.className = 'text-oracle-red text-xs'; }
+        }).catch(() => { setTimeout(check, 3000); });
+    }
+    check();
+}
+
+// Check if pipeline running on load
+fetch('/api/pipeline/status').then(r => r.json()).then(s => {
+    if (s.running) { document.getElementById('settings-pipeline-btn').disabled = true; pollSettingsPipeline(); }
+    else if (s.status === 'complete' && s.last_result) {
+        document.getElementById('settings-pipeline-status').textContent =
+            `Last run: ${s.last_result.builds_created} builds from ${s.last_result.matches_fetched} matches`;
+    }
+}).catch(() => {});
 </script>
 {% endblock %}

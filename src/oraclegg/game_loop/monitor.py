@@ -389,8 +389,11 @@ def _identify_win_conditions(
     return conditions[:6]
 
 
-def _parse_runes(runes_data: dict) -> dict | None:
-    """Parse rune data from Live Client API activePlayer.fullRunes."""
+async def _parse_runes(runes_data: dict) -> dict | None:
+    """Parse rune data from Live Client API activePlayer.fullRunes.
+
+    Enriches with icon paths from the Rune DB for actual icon display.
+    """
     if not runes_data:
         return None
 
@@ -399,15 +402,48 @@ def _parse_runes(runes_data: dict) -> dict | None:
     secondary_tree = runes_data.get("secondaryRuneTree", {})
     general = runes_data.get("generalRunes", [])
 
+    # Collect all rune IDs to batch-fetch icons
+    all_ids = [keystone.get("id", 0)] + [r.get("id", 0) for r in general]
+    all_ids = [rid for rid in all_ids if rid]
+
+    # Look up icon paths from DB
+    icon_map = {}
+    if all_ids:
+        try:
+            from oraclegg.db.models import Rune
+            async with async_session() as session:
+                result = await session.execute(
+                    select(Rune).where(Rune.id.in_(all_ids))
+                )
+                for rune in result.scalars().all():
+                    icon_map[rune.id] = rune.icon
+        except Exception:
+            pass
+
+    ddragon_img = "https://ddragon.leagueoflegends.com/cdn/img"
+
+    def _rune_icon_url(rune_id):
+        path = icon_map.get(rune_id, "")
+        if path:
+            return f"{ddragon_img}/{path}"
+        return ""
+
     return {
         "keystone": {
             "name": keystone.get("displayName", ""),
             "id": keystone.get("id", 0),
+            "icon": _rune_icon_url(keystone.get("id", 0)),
+            "description": keystone.get("rawDescription", ""),
         },
         "primary_tree": primary_tree.get("displayName", ""),
         "secondary_tree": secondary_tree.get("displayName", ""),
         "all_runes": [
-            {"name": r.get("displayName", ""), "id": r.get("id", 0)}
+            {
+                "name": r.get("displayName", ""),
+                "id": r.get("id", 0),
+                "icon": _rune_icon_url(r.get("id", 0)),
+                "description": r.get("rawDescription", ""),
+            }
             for r in general
         ],
     }
@@ -605,7 +641,7 @@ async def _initialize_game(data: dict):
     win_condition = _identify_win_conditions(allies, enemies, champ_data, None, archetypes)
 
     # Parse runes from active player
-    runes = _parse_runes(active.get("fullRunes", {}))
+    runes = await _parse_runes(active.get("fullRunes", {}))
 
     # Parse summoner spells
     summoner_spells = _parse_spells(you)

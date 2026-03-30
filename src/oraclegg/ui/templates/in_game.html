@@ -191,7 +191,20 @@ function renderDashboard(state) {
         const icon = state.your_champion_icon || state.your_champion;
         document.getElementById('matchup-icon').src = champIcon(icon);
         document.getElementById('matchup-champ').textContent = state.your_champion;
-        document.getElementById('matchup-role').textContent = state.your_role || '';
+
+        // Show role + difficulty
+        let roleText = state.your_role || '';
+        // Estimate difficulty from lane matchup rating
+        if (state.lane_matchups) {
+            const myLane = state.lane_matchups.find(m => m.ally_champ === state.your_champion);
+            if (myLane) {
+                const diffMap = { 'POSITIVE': 'Easy', 'EVEN': 'Medium', 'NEGATIVE': 'Hard' };
+                const diff = diffMap[myLane.rating] || 'Medium';
+                const diffColor = { 'Easy': 'text-oracle-green', 'Medium': 'text-oracle-gold', 'Hard': 'text-oracle-red' }[diff];
+                roleText = `<span class="${diffColor}">Difficulty: ${diff}</span>`;
+            }
+        }
+        document.getElementById('matchup-role').innerHTML = roleText;
 
         if (state.enemy_archetypes && state.enemy_archetypes.length > 0) {
             const tag = document.getElementById('comp-tag');
@@ -200,26 +213,40 @@ function renderDashboard(state) {
         }
     }
 
-    // RUNES section
+    // RUNES section — show actual icons from DDragon with hover tooltips
     if (state.runes) {
         const runes = state.runes;
-        let html = '';
-        html += `<div class="flex items-center gap-2 mb-1">
-            <div class="w-10 h-10 rounded-full bg-oracle-gold/20 border-2 border-oracle-gold/50 flex items-center justify-center">
-                <span class="text-oracle-gold text-lg font-bold">${runes.keystone.name.charAt(0)}</span>
-            </div>
-            <div>
-                <div class="text-oracle-light font-bold text-sm">${runes.keystone.name}</div>
-                <div class="text-oracle-text/50 text-[10px]">${runes.primary_tree} + ${runes.secondary_tree}</div>
-            </div>
-        </div>`;
-        if (runes.all_runes && runes.all_runes.length > 0) {
-            html += '<div class="flex flex-wrap gap-1 mt-1">';
-            runes.all_runes.forEach(r => {
-                html += `<span class="bg-oracle-bg text-oracle-text/70 text-[10px] px-1.5 py-0.5 rounded border border-oracle-border">${r.name}</span>`;
-            });
-            html += '</div>';
+        const primary = runes.all_runes ? runes.all_runes.slice(0, 4) : [];
+        const secondary = runes.all_runes ? runes.all_runes.slice(4, 6) : [];
+
+        function runeImg(r, size = 'w-10 h-10') {
+            if (r.icon) {
+                return `<div class="relative group cursor-pointer">
+                    <img src="${r.icon}" class="${size} rounded-full bg-oracle-bg border border-oracle-border/50" alt="${r.name}" onerror="this.outerHTML='<div class=\\'${size} rounded-full bg-oracle-gold/20 border border-oracle-gold/40 flex items-center justify-center\\'><span class=\\'text-oracle-gold text-xs font-bold\\'>${r.name.charAt(0)}</span></div>'">
+                    <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-oracle-bg border border-oracle-border rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 w-48">
+                        <div class="text-oracle-light text-xs font-bold mb-1">${r.name}</div>
+                    </div>
+                </div>`;
+            }
+            return `<div class="${size} rounded-full bg-oracle-gold/20 border border-oracle-gold/40 flex items-center justify-center" title="${r.name}"><span class="text-oracle-gold text-xs font-bold">${r.name.charAt(0)}</span></div>`;
         }
+
+        let html = '<div class="flex items-center gap-4">';
+        // Primary tree runes (keystone larger, then 3 smaller)
+        html += '<div class="flex items-center gap-1.5">';
+        if (primary.length > 0) {
+            html += runeImg(runes.keystone.icon ? runes.keystone : primary[0], 'w-12 h-12');
+            primary.slice(1).forEach(r => { html += runeImg(r, 'w-9 h-9'); });
+        }
+        html += '</div>';
+        // Divider
+        html += '<div class="w-px h-10 bg-oracle-border/50"></div>';
+        // Secondary tree runes
+        html += '<div class="flex items-center gap-1.5">';
+        secondary.forEach(r => { html += runeImg(r, 'w-9 h-9'); });
+        html += '</div>';
+        html += '</div>';
+
         document.getElementById('runes-content').innerHTML = html;
         document.getElementById('rune-tags').innerHTML = `
             <span class="bg-oracle-purple/20 text-oracle-purple text-[10px] px-1.5 py-0.5 rounded-full border border-oracle-purple/30">${runes.primary_tree}</span>
@@ -295,23 +322,40 @@ function renderDashboard(state) {
     // LANE MATCHUPS section (with enemy stats from scouting)
     if (state.lane_matchups && state.lane_matchups.length > 0) {
         const lmDiv = document.getElementById('lane-matchups');
-        lmDiv.innerHTML = state.lane_matchups.map(lm => {
+
+        // Calculate win probability from matchup ratings
+        const ratingScores = { 'POSITIVE': 1, 'EVEN': 0, 'NEGATIVE': -1 };
+        let totalScore = 0;
+        state.lane_matchups.forEach(lm => { totalScore += (ratingScores[lm.rating] || 0); });
+        // Map score [-5, 5] to probability [20%, 80%]
+        const winProb = Math.round(50 + totalScore * 6);
+        const wpEl = document.getElementById('win-prob');
+        if (wpEl) {
+            const wpColor = winProb >= 55 ? 'bg-oracle-green/20 text-oracle-green border-oracle-green/30'
+                : winProb <= 45 ? 'bg-oracle-red/20 text-oracle-red border-oracle-red/30'
+                : 'bg-oracle-gold/20 text-oracle-gold border-oracle-gold/30';
+            wpEl.className = `text-xs px-2 py-0.5 rounded-full border ${wpColor}`;
+            wpEl.textContent = `${winProb}% win prob.`;
+            wpEl.classList.remove('hidden');
+        }
+
+        // Group ADC + SUPPORT as "Bot" lane like mockup
+        const soloLanes = state.lane_matchups.filter(m => m.role !== 'ADC' && m.role !== 'SUPPORT');
+        const botAlly = state.lane_matchups.filter(m => m.role === 'ADC' || m.role === 'SUPPORT');
+        const botEnemy = botAlly.length >= 2 ? botAlly : [];
+
+        function renderLane(lm) {
             const style = RATING_STYLES[lm.rating] || RATING_STYLES['EVEN'];
             const es = lm.enemy_stats || {};
-
-            // Build enemy stat badges
             let badges = '';
             if (es.first_timing) badges += '<span class="bg-oracle-purple/20 text-oracle-purple text-[9px] px-1 py-0.5 rounded-full">1ST TIME</span>';
             if (es.tilted) badges += '<span class="bg-oracle-red/20 text-oracle-red text-[9px] px-1 py-0.5 rounded-full">TILTED</span>';
             if (es.one_trick) badges += '<span class="bg-oracle-gold/20 text-oracle-gold text-[9px] px-1 py-0.5 rounded-full">OTP</span>';
             if (es.hot_streak) badges += '<span class="bg-oracle-green/20 text-oracle-green text-[9px] px-1 py-0.5 rounded-full">HOT</span>';
-
-            // Enemy stats line
             let statsLine = '';
             if (es.rank) statsLine += `<span class="text-oracle-text/40">${es.rank.split(' ').slice(0,2).join(' ')}</span>`;
             if (es.champ_wr != null && es.champ_games) statsLine += `<span class="${es.champ_wr >= 55 ? 'text-oracle-green' : es.champ_wr <= 45 ? 'text-oracle-red' : 'text-oracle-gold'}">${es.champ_wr}%</span><span class="text-oracle-text/30">(${es.champ_games}g)</span>`;
             else if (es.win_rate != null) statsLine += `<span class="${es.win_rate >= 55 ? 'text-oracle-green' : es.win_rate <= 45 ? 'text-oracle-red' : 'text-oracle-gold'}">${es.win_rate}% WR</span>`;
-
             return `<div class="flex items-center justify-between py-1.5 px-2 rounded hover:bg-oracle-border/10 transition-colors">
                 <div class="flex items-center gap-2 w-28">
                     <img src="${champIcon(lm.ally_icon)}" class="w-7 h-7 rounded border border-oracle-border" alt="" onerror="this.style.display='none'">
@@ -329,7 +373,30 @@ function renderDashboard(state) {
                     <img src="${champIcon(lm.enemy_icon)}" class="w-7 h-7 rounded border border-oracle-border" alt="" onerror="this.style.display='none'">
                 </div>
             </div>`;
-        }).join('');
+        }
+
+        // Render solo lanes + bot lane grouped
+        let html = soloLanes.map(renderLane).join('');
+        if (botEnemy.length >= 2) {
+            // Bot lane: show both champs per side with shared rating
+            const botRating = botEnemy[0].rating; // Use ADC matchup rating for the pair
+            const bs = RATING_STYLES[botRating] || RATING_STYLES['EVEN'];
+            html += `<div class="flex items-center justify-between py-1.5 px-2 rounded hover:bg-oracle-border/10 transition-colors">
+                <div class="flex items-center gap-1 w-28">
+                    ${botEnemy.map(b => `<img src="${champIcon(b.ally_icon)}" class="w-7 h-7 rounded border border-oracle-border" alt="" onerror="this.style.display='none'">`).join('')}
+                    <span class="text-oracle-text/50 text-xs ml-1">Bot</span>
+                </div>
+                <span class="${bs.bg} ${bs.text} border ${bs.border} text-[10px] px-2 py-0.5 rounded-full font-bold">${bs.label}</span>
+                <div class="flex items-center gap-1 w-28 justify-end">
+                    <span class="text-oracle-text/50 text-xs mr-1">Bot</span>
+                    ${botEnemy.map(b => `<img src="${champIcon(b.enemy_icon)}" class="w-7 h-7 rounded border border-oracle-border" alt="" onerror="this.style.display='none'">`).join('')}
+                </div>
+            </div>`;
+        } else {
+            // Fallback: render ADC and SUPPORT individually
+            html += botAlly.map(renderLane).join('');
+        }
+        lmDiv.innerHTML = html;
     }
 
     // BUILD section

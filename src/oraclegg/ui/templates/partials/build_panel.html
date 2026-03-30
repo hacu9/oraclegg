@@ -55,17 +55,47 @@
     </div>
     {% endif %}
 
+    <!-- Runes -->
+    {% if rec.runes %}
+    <div>
+        <h3 class="text-oracle-gold text-xs uppercase tracking-wider mb-2">Runes</h3>
+        <div class="space-y-1.5">
+            <div class="flex items-center gap-2">
+                <span class="bg-oracle-gold/20 text-oracle-gold text-xs px-1.5 py-0.5 rounded border border-oracle-gold/30 font-bold">{{ rec.runes.keystone.name }}</span>
+            </div>
+            <div class="flex flex-wrap gap-1">
+                {% for r in rec.runes.primary %}
+                <span class="bg-oracle-bg text-oracle-text/70 text-[10px] px-1.5 py-0.5 rounded border border-oracle-border">{{ r.name }}</span>
+                {% endfor %}
+            </div>
+            <div class="flex flex-wrap gap-1">
+                {% for r in rec.runes.secondary %}
+                <span class="bg-oracle-bg text-oracle-text/60 text-[10px] px-1.5 py-0.5 rounded border border-oracle-border/60">{{ r.name }}</span>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Summoner Spells -->
     <div>
         <h3 class="text-oracle-gold text-xs uppercase tracking-wider mb-2">Summoner Spells</h3>
         <div class="flex gap-2 text-sm">
-            {% for spell_id in rec.summoner_spells %}
+            {% for spell in rec.summoner_spells %}
             <span class="bg-oracle-bg px-2 py-1 rounded border border-oracle-border text-oracle-light">
-                {% if spell_id == 4 %}Flash{% elif spell_id == 14 %}Ignite{% elif spell_id == 12 %}Teleport{% elif spell_id == 11 %}Smite{% elif spell_id == 3 %}Exhaust{% elif spell_id == 7 %}Heal{% elif spell_id == 6 %}Ghost{% elif spell_id == 1 %}Cleanse{% elif spell_id == 21 %}Barrier{% else %}Spell {{ spell_id }}{% endif %}
+                {{ spell.name }}
             </span>
             {% endfor %}
         </div>
     </div>
+
+    <!-- Skill Order -->
+    {% if rec.skill_max_order %}
+    <div>
+        <h3 class="text-oracle-gold text-xs uppercase tracking-wider mb-2">Skill Max</h3>
+        <span class="text-oracle-light font-bold">{{ rec.skill_max_order }}</span>
+    </div>
+    {% endif %}
 
     <!-- Patch info -->
     <div class="text-oracle-text/40 text-xs pt-2 border-t border-oracle-border">

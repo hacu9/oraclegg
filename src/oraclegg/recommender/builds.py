@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from oraclegg.db.engine import async_session
-from oraclegg.db.models import BuildAggregate, Champion, Item
+from oraclegg.db.models import BuildAggregate, Champion, Item, Rune
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,18 @@ async def get_item_names(item_ids: list[int]) -> dict[int, str]:
         )
         items = result.scalars().all()
         return {i.id: i.name for i in items}
+
+
+async def get_rune_names(rune_ids: list[int]) -> dict[int, str]:
+    """Resolve rune IDs to display names."""
+    if not rune_ids:
+        return {}
+    async with async_session() as session:
+        result = await session.execute(
+            select(Rune).where(Rune.id.in_(rune_ids))
+        )
+        runes = result.scalars().all()
+        return {r.id: r.name for r in runes}
 
 
 async def get_champion_info(champion_id: int) -> dict | None:
@@ -128,12 +140,20 @@ async def recommend_build(
                 "message": "No build data available. Run the pipeline to collect data.",
             }
 
-        # Resolve item names
+        # Resolve item and rune names
         build_ids = json.loads(best_match.item_build_path)
+        primary_runes = json.loads(best_match.primary_runes)
+        secondary_runes = json.loads(best_match.secondary_runes)
+        all_rune_ids = [best_match.primary_keystone] + primary_runes + secondary_runes
+
         item_names = await get_item_names(
             build_ids + ([best_match.boots_id] if best_match.boots_id else [])
         )
+        rune_names = await get_rune_names([rid for rid in all_rune_ids if rid])
         champ_info = await get_champion_info(champion_id)
+
+        from oraclegg.constants import spell_name
+        spell_ids = json.loads(best_match.summoner_spells)
 
         return {
             "champion": champ_info or {"id": champion_id, "name": "Unknown"},
@@ -152,13 +172,24 @@ async def recommend_build(
             } if best_match.boots_id else None,
             "skill_order": json.loads(best_match.skill_order) if best_match.skill_order else [],
             "skill_max_order": best_match.skill_max_order,
-            "summoner_spells": json.loads(best_match.summoner_spells),
+            "summoner_spells": [
+                {"id": sid, "name": spell_name(sid)} for sid in spell_ids
+            ],
             "runes": {
                 "primary_tree": best_match.primary_rune_tree,
-                "keystone": best_match.primary_keystone,
-                "primary": json.loads(best_match.primary_runes),
+                "keystone": {
+                    "id": best_match.primary_keystone,
+                    "name": rune_names.get(best_match.primary_keystone, "Unknown"),
+                },
+                "primary": [
+                    {"id": rid, "name": rune_names.get(rid, f"Rune {rid}")}
+                    for rid in primary_runes
+                ],
                 "secondary_tree": best_match.secondary_rune_tree,
-                "secondary": json.loads(best_match.secondary_runes),
+                "secondary": [
+                    {"id": rid, "name": rune_names.get(rid, f"Rune {rid}")}
+                    for rid in secondary_runes
+                ],
                 "shards": json.loads(best_match.stat_shards),
             },
             "patch": best_match.patch,

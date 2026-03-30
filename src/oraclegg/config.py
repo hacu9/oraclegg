@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     pipeline_matches_per_player: int = 10
     pipeline_min_sample_size: int = 30
 
+    # Claude API (optional, for AI post-game analysis)
+    anthropic_api_key: str = ""
+
     # DDragon (updated on startup)
     ddragon_version: str = "14.10.1"
 

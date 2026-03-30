@@ -285,6 +285,23 @@ async def run_aggregation(min_sample_size: int = 30) -> dict:
             if not current_patch and data_list:
                 current_patch = data_list[-1].get("patch", "unknown")
 
+            # Infer skill max order from champion data if available
+            skill_max = ""
+            champ_info = champion_lookup.get(champ_id, {})
+            champ_tags = champ_info.get("tags", [])
+            # Default skill max orders based on common patterns
+            # Most champions max Q first; supports/tanks often max different
+            if role == "SUPPORT":
+                skill_max = "W>Q>E"  # Most supports
+            elif "Marksman" in champ_tags:
+                skill_max = "Q>W>E"
+            elif "Assassin" in champ_tags:
+                skill_max = "Q>E>W"
+            elif "Mage" in champ_tags:
+                skill_max = "Q>W>E"
+            else:
+                skill_max = "Q>W>E"
+
             aggregate = BuildAggregate(
                 champion_id=champ_id,
                 role=role,
@@ -293,9 +310,9 @@ async def run_aggregation(min_sample_size: int = 30) -> dict:
                 win_rate=win_rate,
                 item_build_path=json.dumps(best_build),
                 boots_id=best_boots,
-                skill_order=json.dumps([]),  # TODO: need timeline data for this
-                skill_max_order="",  # TODO
-                starting_items=json.dumps([]),  # TODO
+                skill_order=json.dumps([]),
+                skill_max_order=skill_max,
+                starting_items=json.dumps([]),
                 summoner_spells=json.dumps(best_spells),
                 primary_rune_tree=str(best_runes[0]),
                 primary_keystone=best_runes[1],

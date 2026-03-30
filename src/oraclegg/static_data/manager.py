@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from oraclegg.db.engine import async_session
-from oraclegg.db.models import Champion, Item
+from oraclegg.db.models import Champion, Item, Rune
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +130,48 @@ async def seed_items(session: AsyncSession, patch: str):
     logger.info(f"Seeded {count} items")
 
 
+async def fetch_ddragon_runes(patch: str) -> list:
+    url = f"{DDRAGON_BASE}/{patch}/data/en_US/runesReforged.json"
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.get(url)
+        resp.raise_for_status()
+        return resp.json()
+
+
+async def seed_runes(session: AsyncSession, patch: str):
+    """Fetch rune data from DDragon and store in DB."""
+    logger.info("Fetching rune data...")
+
+    try:
+        trees = await fetch_ddragon_runes(patch)
+    except Exception as e:
+        logger.warning(f"Rune fetch failed: {e}")
+        return
+
+    count = 0
+    for tree in trees:
+        tree_id = tree.get("id", 0)
+        tree_name = tree.get("name", "")
+        tree_icon = tree.get("icon", "")
+
+        for slot_idx, slot in enumerate(tree.get("slots", [])):
+            for rune_data in slot.get("runes", []):
+                rune = Rune(
+                    id=rune_data["id"],
+                    name=rune_data["name"],
+                    tree_id=tree_id,
+                    tree_name=tree_name,
+                    slot=slot_idx,
+                    icon=rune_data.get("icon", ""),
+                    patch=patch,
+                )
+                await session.merge(rune)
+                count += 1
+
+    await session.commit()
+    logger.info(f"Seeded {count} runes")
+
+
 async def seed_all():
     """Seed all static data."""
     patch = await get_latest_patch()
@@ -138,6 +180,7 @@ async def seed_all():
     async with async_session() as session:
         await seed_champions(session, patch)
         await seed_items(session, patch)
+        await seed_runes(session, patch)
 
     logger.info("Static data seeding complete")
 

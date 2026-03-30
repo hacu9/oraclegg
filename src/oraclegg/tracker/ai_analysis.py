@@ -224,8 +224,29 @@ async def generate_analysis(match_id: str) -> dict | None:
 
     # Key takeaway
     takeaways = _generate_takeaways(match, champ_name, kda_ratio, game_mins)
+
+    # Try AI-powered coaching insights
+    ai_tips = await _generate_ai_analysis({
+        "champion": champ_name,
+        "role": match.role,
+        "win": match.win,
+        "kills": match.kills,
+        "deaths": match.deaths,
+        "assists": match.assists,
+        "kda_ratio": kda_ratio,
+        "cs_per_min": match.cs_per_min,
+        "vision_score": match.vision_score,
+        "game_mins": game_mins,
+        "damage_dealt": match.damage_dealt,
+        "gold_earned": match.gold_earned,
+        "items": items,
+        "enemies": enemies,
+    })
+    if ai_tips:
+        takeaways = ai_tips  # Replace rule-based with AI insights
+
     sections.append({
-        "title": "Key Takeaways",
+        "title": "Coaching Insights" if ai_tips else "Key Takeaways",
         "content": "",
         "details": takeaways,
     })
@@ -303,6 +324,62 @@ def _generate_takeaways(match, champ_name, kda_ratio, game_mins):
         takeaways.append("Very low vision score. Placing wards prevents deaths and enables plays.")
 
     return takeaways
+
+
+async def _generate_ai_analysis(match_data: dict) -> list[str] | None:
+    """Use Claude API to generate coaching insights for a match.
+
+    Returns list of coaching insight strings or None if API unavailable.
+    """
+    from oraclegg.config import settings
+
+    if not settings.anthropic_api_key:
+        return None
+
+    try:
+        import anthropic
+
+        client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+
+        prompt = f"""You are a League of Legends coach analyzing a match. Give 3-4 specific,
+actionable coaching tips based on this match data. Be direct and concise. Each tip should be
+1-2 sentences max.
+
+Match: {match_data['champion']} {match_data['role']} - {'Victory' if match_data['win'] else 'Defeat'}
+KDA: {match_data['kills']}/{match_data['deaths']}/{match_data['assists']} ({match_data['kda_ratio']:.1f} KDA)
+CS/min: {match_data.get('cs_per_min', 0)}
+Vision Score: {match_data.get('vision_score', 0)}
+Game Duration: {match_data.get('game_mins', 0):.0f} minutes
+Damage to Champions: {match_data.get('damage_dealt', 0):,}
+Gold Earned: {match_data.get('gold_earned', 0):,}
+Items: {', '.join(match_data.get('items', []))}
+Enemies: {', '.join(match_data.get('enemies', []))}
+
+Give specific tips for improving, not generic advice. Focus on what went wrong
+or what could be better based on the numbers."""
+
+        message = await client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=300,
+            messages=[{"role": "user", "content": prompt}],
+        )
+
+        text = message.content[0].text
+        # Parse numbered tips into a list
+        tips = []
+        for line in text.strip().split("\n"):
+            line = line.strip()
+            if line and not line.startswith("#"):
+                # Remove numbering like "1.", "2.", "- ", etc.
+                cleaned = line.lstrip("0123456789.-) ").strip()
+                if cleaned:
+                    tips.append(cleaned)
+
+        return tips if tips else None
+
+    except Exception as e:
+        logger.warning(f"Claude API analysis failed: {e}")
+        return None
 
 
 async def get_or_generate_analysis(match_id: str) -> dict | None:

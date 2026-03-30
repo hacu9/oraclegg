@@ -105,6 +105,24 @@
         <div id="key-status" class="text-xs mt-2"></div>
     </div>
 
+    <!-- Claude API Key (optional) -->
+    <div class="bg-oracle-card border border-oracle-border rounded-lg p-6">
+        <h2 class="text-oracle-light font-semibold mb-2">AI Coaching <span class="text-oracle-text/40 text-xs font-normal ml-1">optional</span></h2>
+        <p class="text-oracle-text/60 text-sm mb-4">Add a Claude API key for AI-powered post-game analysis with personalized coaching insights. Get one at <a href="https://console.anthropic.com/" target="_blank" class="text-oracle-blue hover:underline">console.anthropic.com</a>.</p>
+
+        <form id="claude-key-form" class="flex gap-2">
+            <input type="text" id="claude-key-input" placeholder="sk-ant-api03-..."
+                   class="flex-1 bg-oracle-bg border border-oracle-border rounded px-3 py-2 text-oracle-light
+                          placeholder-oracle-text/30 focus:border-oracle-gold focus:outline-none text-sm font-mono">
+            <button type="submit"
+                    class="bg-oracle-purple/20 border border-oracle-purple text-oracle-purple px-4 py-2 rounded
+                           hover:bg-oracle-purple/30 transition-colors text-sm font-medium" id="save-claude-btn">
+                Save
+            </button>
+        </form>
+        <div id="claude-key-status" class="text-xs mt-2"></div>
+    </div>
+
     <!-- Summoner -->
     <div class="bg-oracle-card border border-oracle-border rounded-lg p-6">
         <h2 class="text-oracle-light font-semibold mb-2">Summoner</h2>
@@ -251,6 +269,34 @@ document.getElementById('region-form').addEventListener('submit', async (e) => {
             '<span class="text-oracle-red">Failed to save</span>';
     }
 });
+
+// Claude API key
+document.getElementById('claude-key-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const key = document.getElementById('claude-key-input').value.trim();
+    const btn = document.getElementById('save-claude-btn');
+    const status = document.getElementById('claude-key-status');
+    btn.textContent = 'Saving...';
+    try {
+        const r = await fetch('/api/settings/claude-key', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ key }),
+        });
+        const d = await r.json();
+        if (d.ok) {
+            status.innerHTML = key
+                ? '<span class="text-oracle-green">Saved. AI coaching is now enabled for post-game analysis.</span>'
+                : '<span class="text-oracle-text/50">AI coaching disabled.</span>';
+            document.getElementById('claude-key-input').value = '';
+        }
+    } catch { status.innerHTML = '<span class="text-oracle-red">Failed to save.</span>'; }
+    btn.textContent = 'Save';
+});
+
+// Check if Claude key is set
+fetch('/api/settings/account').then(r => r.json()).then(d => {
+    // The account endpoint doesn't include Claude key status yet, but that's OK
+}).catch(() => {});
 
 // Load API key status
 fetch('/api/settings/account').then(r => r.json()).then(d => {

@@ -787,3 +787,68 @@ async def game_monitor_loop():
             logger.debug(f"Monitor poll error: {e}")
 
         await asyncio.sleep(poll_interval)
+
+
+async def lcu_monitor_loop():
+    """Background loop that polls the LCU for champ select state.
+
+    Detects when the user enters champ select and updates game_state
+    so the UI can show the champ select page.
+    """
+    from oraclegg.riot.lcu import LCUClient
+
+    lcu = LCUClient()
+    poll_interval = settings.lcu_poll_interval
+    was_in_champ_select = False
+
+    logger.info("LCU monitor started")
+
+    while True:
+        try:
+            # Try to connect if not connected
+            if not lcu.connected:
+                await lcu.connect(settings.lcu_path)
+                if not lcu.connected:
+                    await asyncio.sleep(poll_interval * 5)  # Slower poll when not connected
+                    continue
+
+            # Check gameflow phase
+            phase = await lcu.get_gameflow_phase()
+
+            if phase == "ChampSelect":
+                if not was_in_champ_select:
+                    logger.info("LCU: Entered champ select")
+                    game_state["lcu_phase"] = "champ_select"
+
+                    # Get champ select session data
+                    session_data = await lcu.get_champ_select_session()
+                    if session_data:
+                        game_state["champ_select_data"] = session_data
+
+                    was_in_champ_select = True
+                else:
+                    # Update session data (picks change during champ select)
+                    session_data = await lcu.get_champ_select_session()
+                    if session_data:
+                        game_state["champ_select_data"] = session_data
+
+            elif phase == "InProgress":
+                game_state["lcu_phase"] = "in_game"
+                was_in_champ_select = False
+
+            else:
+                if was_in_champ_select:
+                    logger.info("LCU: Left champ select")
+                game_state["lcu_phase"] = phase or "idle"
+                was_in_champ_select = False
+
+        except Exception as e:
+            logger.debug(f"LCU poll error: {e}")
+            # Reset connection on error
+            try:
+                await lcu.close()
+            except Exception:
+                pass
+            lcu = LCUClient()
+
+        await asyncio.sleep(poll_interval)

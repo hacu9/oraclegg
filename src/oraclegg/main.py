@@ -38,9 +38,10 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"  Seed failed: {e} (you can retry from Settings)")
 
-    # Start background game monitor
-    from oraclegg.game_loop.monitor import game_monitor_loop
+    # Start background game monitor + LCU champ select monitor
+    from oraclegg.game_loop.monitor import game_monitor_loop, lcu_monitor_loop
     monitor_task = asyncio.create_task(game_monitor_loop())
+    lcu_task = asyncio.create_task(lcu_monitor_loop())
 
     # Auto-run pipeline if API key is set but no builds exist
     from oraclegg.pipeline.runner import auto_pipeline_if_needed

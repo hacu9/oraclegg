@@ -326,6 +326,27 @@ async def save_api_key(request: Request):
     return {"valid": True}
 
 
+@router.post("/api/settings/claude-key")
+async def save_claude_key(request: Request):
+    """Save Claude API key for AI analysis."""
+    data = await request.json()
+    key = data.get("key", "").strip()
+
+    # Save to .env
+    import re
+    env_path = Path(".env")
+    if env_path.exists():
+        content = env_path.read_text()
+        if "ANTHROPIC_API_KEY=" in content:
+            content = re.sub(r"ANTHROPIC_API_KEY=.*", f"ANTHROPIC_API_KEY={key}", content)
+        else:
+            content += f"\nANTHROPIC_API_KEY={key}\n"
+        env_path.write_text(content)
+
+    settings.anthropic_api_key = key
+    return {"ok": True}
+
+
 @router.post("/api/settings/region")
 async def save_region(request: Request):
     """Save region/platform settings."""
@@ -551,6 +572,8 @@ async def get_game_state():
         "next_dragon": game_state.get("next_dragon", "Unknown"),
         "dragons_taken": game_state.get("dragons_taken", 0),
         "last_update": game_state.get("last_update"),
+        "lcu_phase": game_state.get("lcu_phase"),
+        "champ_select_data": game_state.get("champ_select_data"),
         # Enhanced game intelligence (populated on game start)
         "your_champion": game_state.get("your_champion"),
         "your_champion_icon": game_state.get("your_champion_icon"),

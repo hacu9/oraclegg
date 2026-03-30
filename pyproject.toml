@@ -17,6 +17,7 @@ dependencies = [
     "alembic>=1.13.0",
     "python-multipart>=0.0.9",
     "pywebview>=6.1",
+    "anthropic>=0.40.0",
 ]
 
 [project.optional-dependencies]

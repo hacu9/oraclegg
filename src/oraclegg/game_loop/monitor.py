@@ -745,11 +745,17 @@ async def game_monitor_loop():
                     if e.get("EventName") == "DragonKill"
                 ]
                 game_state["dragons_taken"] = len(dragon_kills)
+                dragon_types_taken = []
+                for dk in dragon_kills:
+                    dt = dk.get("DragonType", dk.get("Result", ""))
+                    if dt:
+                        dragon_types_taken.append(dt)
+                game_state["dragon_types_taken"] = dragon_types_taken
                 if dragon_kills:
-                    last_dragon = dragon_kills[-1]
-                    game_state["last_dragon"] = last_dragon.get("DragonType", "")
+                    game_state["last_dragon"] = dragon_types_taken[-1] if dragon_types_taken else ""
 
-                if map_terrain != "Default" and len(dragon_kills) >= 2:
+                # After rift transforms, all future dragons are the terrain type
+                if map_terrain != "Default":
                     game_state["next_dragon"] = map_terrain
                 else:
                     game_state["next_dragon"] = "Unknown"

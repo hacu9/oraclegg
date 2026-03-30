@@ -213,7 +213,29 @@ function renderCharts(matches) {
 
     // Reverse so oldest first (left to right)
     const sorted = [...matches].reverse();
-    const labels = sorted.map(m => m.champion);
+    const labels = sorted.map(m => '');  // Empty labels, icons drawn via plugin
+    const champImages = sorted.map(m => {
+        const img = new Image(24, 24);
+        img.src = `${DDRAGON}/champion/${champIconKey(m.champion_key || m.champion)}.png`;
+        return img;
+    });
+
+    // Plugin to draw champion icons as x-axis labels
+    const champIconPlugin = {
+        id: 'champIcons',
+        afterDraw(chart) {
+            const xAxis = chart.scales.x;
+            const ctx = chart.ctx;
+            xAxis.ticks.forEach((tick, i) => {
+                const x = xAxis.getPixelForTick(i);
+                const y = xAxis.bottom + 4;
+                const img = champImages[i];
+                if (img && img.complete && img.naturalWidth > 0) {
+                    ctx.drawImage(img, x - 10, y, 20, 20);
+                }
+            });
+        }
+    };
 
     // Rolling win rate (3-game window)
     const wrData = [];
@@ -229,8 +251,9 @@ function renderCharts(matches) {
     const chartOpts = {
         responsive: true,
         plugins: { legend: { display: false } },
+        layout: { padding: { bottom: 25 } },
         scales: {
-            x: { grid: { color: '#1e2a36' }, ticks: { color: '#a09b8c', font: { size: 10 } } },
+            x: { grid: { color: '#1e2a36' }, ticks: { display: false } },
             y: { grid: { color: '#1e2a36' }, ticks: { color: '#a09b8c', font: { size: 10 } } },
         },
     };
@@ -246,7 +269,7 @@ function renderCharts(matches) {
                 backgroundColor: 'rgba(200, 155, 60, 0.1)',
                 fill: true,
                 tension: 0.3,
-                pointRadius: 3,
+                pointRadius: 4,
                 pointBackgroundColor: sorted.map(m => m.win ? '#28c76f' : '#e84057'),
             }],
         },
@@ -256,7 +279,20 @@ function renderCharts(matches) {
                 ...chartOpts.scales,
                 y: { ...chartOpts.scales.y, min: 0, max: 100, ticks: { ...chartOpts.scales.y.ticks, callback: v => v + '%' } },
             },
+            plugins: {
+                ...chartOpts.plugins,
+                tooltip: {
+                    callbacks: {
+                        title: (ctx) => sorted[ctx[0].dataIndex]?.champion || '',
+                        label: (ctx) => {
+                            const m = sorted[ctx.dataIndex];
+                            return `${ctx.parsed.y}% WR | ${m.kda} (${m.win ? 'W' : 'L'})`;
+                        },
+                    }
+                }
+            },
         },
+        plugins: [champIconPlugin],
     });
 
     // KDA chart
@@ -272,7 +308,22 @@ function renderCharts(matches) {
                 borderRadius: 3,
             }],
         },
-        options: chartOpts,
+        options: {
+            ...chartOpts,
+            plugins: {
+                ...chartOpts.plugins,
+                tooltip: {
+                    callbacks: {
+                        title: (ctx) => sorted[ctx[0].dataIndex]?.champion || '',
+                        label: (ctx) => {
+                            const m = sorted[ctx.dataIndex];
+                            return `${ctx.parsed.y} KDA | ${m.kda} (${m.win ? 'W' : 'L'})`;
+                        },
+                    }
+                }
+            },
+        },
+        plugins: [champIconPlugin],
     });
 }
 

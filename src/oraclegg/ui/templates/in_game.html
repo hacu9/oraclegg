@@ -85,7 +85,10 @@
 
         <!-- BUILD -->
         <div class="col-span-4 bg-oracle-card border border-oracle-border rounded-lg p-4">
-            <h2 class="text-oracle-text text-xs uppercase tracking-wider font-semibold mb-3">Build</h2>
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-oracle-text text-xs uppercase tracking-wider font-semibold">Recommended Build</h2>
+                <span class="text-oracle-text/30 text-[9px]">Master+ data</span>
+            </div>
             <div id="build-items" class="space-y-1.5">
                 <div class="text-oracle-text/50 text-sm">Loading recommendation...</div>
             </div>
@@ -189,7 +192,10 @@
     <div class="bg-oracle-card border border-oracle-border rounded-lg p-12 text-center">
         <div class="text-oracle-text text-lg mb-2">Waiting for game...</div>
         <p class="text-oracle-text/60 text-sm">This page auto-updates when a game is detected.</p>
-        <p class="text-oracle-text/40 text-xs mt-4">Make sure League of Legends is running and you are in a game.</p>
+        <a href="/demo" class="inline-block mt-4 bg-oracle-gold/20 border border-oracle-gold text-oracle-gold px-4 py-2 rounded hover:bg-oracle-gold/30 transition-colors text-sm">
+            Preview Demo
+        </a>
+        <p class="text-oracle-text/40 text-xs mt-2">See how it looks with sample data</p>
     </div>
 </div>
 
@@ -344,9 +350,9 @@ function formatTime(secs) {
 }
 
 const RATING_STYLES = {
-    'POSITIVE': { bg: 'bg-oracle-green/15', text: 'text-oracle-green', border: 'border-oracle-green/30', label: 'POSITIVE' },
-    'EVEN':     { bg: 'bg-oracle-gold/15', text: 'text-oracle-gold', border: 'border-oracle-gold/30', label: 'EVEN' },
-    'NEGATIVE': { bg: 'bg-oracle-red/15', text: 'text-oracle-red', border: 'border-oracle-red/30', label: 'NEGATIVE' },
+    'POSITIVE': { bg: 'bg-oracle-green/15', text: 'text-oracle-green', border: 'border-oracle-green/30', label: '60%', pct: 60 },
+    'EVEN':     { bg: 'bg-oracle-gold/15', text: 'text-oracle-gold', border: 'border-oracle-gold/30', label: '50%', pct: 50 },
+    'NEGATIVE': { bg: 'bg-oracle-red/15', text: 'text-oracle-red', border: 'border-oracle-red/30', label: '40%', pct: 40 },
 };
 
 const TIMING_COLORS = {
@@ -386,10 +392,8 @@ function renderDashboard(state) {
         if (state.lane_matchups) {
             const myLane = state.lane_matchups.find(m => m.ally_champ === state.your_champion);
             if (myLane) {
-                const diffMap = { 'POSITIVE': 'Easy', 'EVEN': 'Medium', 'NEGATIVE': 'Hard' };
-                const diff = diffMap[myLane.rating] || 'Medium';
-                const diffColor = { 'Easy': 'text-oracle-green', 'Medium': 'text-oracle-gold', 'Hard': 'text-oracle-red' }[diff];
-                roleText = `<span class="${diffColor}">Difficulty: ${diff}</span>`;
+                const rs = RATING_STYLES[myLane.rating] || RATING_STYLES['EVEN'];
+                roleText = `<span class="${rs.text}">Lane: ${rs.label}</span>`;
             }
         }
         document.getElementById('matchup-role').innerHTML = roleText;
@@ -407,32 +411,48 @@ function renderDashboard(state) {
         const primary = runes.all_runes ? runes.all_runes.slice(0, 4) : [];
         const secondary = runes.all_runes ? runes.all_runes.slice(4, 6) : [];
 
-        function runeImg(r, size = 'w-10 h-10') {
-            if (r.icon) {
-                return `<div class="relative group cursor-pointer">
-                    <img src="${r.icon}" class="${size} rounded-full bg-oracle-bg border border-oracle-border/50" alt="${r.name}" onerror="this.outerHTML='<div class=\\'${size} rounded-full bg-oracle-gold/20 border border-oracle-gold/40 flex items-center justify-center\\'><span class=\\'text-oracle-gold text-xs font-bold\\'>${r.name.charAt(0)}</span></div>'">
-                    <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-oracle-bg border border-oracle-border rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 w-48">
-                        <div class="text-oracle-light text-xs font-bold mb-1">${r.name}</div>
-                    </div>
-                </div>`;
-            }
-            return `<div class="${size} rounded-full bg-oracle-gold/20 border border-oracle-gold/40 flex items-center justify-center" title="${r.name}"><span class="text-oracle-gold text-xs font-bold">${r.name.charAt(0)}</span></div>`;
+        const DDRAGON_BASE = 'https://ddragon.leagueoflegends.com/cdn/img/';
+        function runeIconUrl(icon) {
+            if (!icon) return '';
+            if (icon.startsWith('http')) return icon;
+            return DDRAGON_BASE + icon;
         }
 
-        let html = '<div class="flex items-center gap-4">';
-        // Primary tree runes (keystone larger, then 3 smaller)
-        html += '<div class="flex items-center gap-1.5">';
-        if (primary.length > 0) {
-            html += runeImg(runes.keystone.icon ? runes.keystone : primary[0], 'w-12 h-12');
-            primary.slice(1).forEach(r => { html += runeImg(r, 'w-9 h-9'); });
+        function runeEl(r, isKeystone = false) {
+            const size = isKeystone ? 'w-10 h-10' : 'w-7 h-7';
+            const iconUrl = runeIconUrl(r.icon);
+            const imgOrLetter = iconUrl
+                ? `<img src="${iconUrl}" class="${size} rounded-full" alt="${r.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+                  + `<div class="${size} rounded-full bg-oracle-gold/20 border border-oracle-gold/40 items-center justify-center" style="display:none"><span class="text-oracle-gold text-[10px] font-bold">${(r.name||'?').charAt(0)}</span></div>`
+                : `<div class="${size} rounded-full bg-oracle-gold/20 border border-oracle-gold/40 flex items-center justify-center"><span class="text-oracle-gold text-[10px] font-bold">${(r.name||'?').charAt(0)}</span></div>`;
+
+            return `<div class="relative group cursor-pointer flex items-center gap-1.5">
+                ${imgOrLetter}
+                <span class="${isKeystone ? 'text-oracle-light text-xs font-bold' : 'text-oracle-text/60 text-[10px]'}">${r.name || 'Unknown'}</span>
+                <div class="absolute bottom-full left-0 mb-2 px-3 py-2 bg-oracle-card border border-oracle-border rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 w-52">
+                    <div class="text-oracle-light text-xs font-bold">${r.name || 'Unknown'}</div>
+                    <div class="text-oracle-text/50 text-[10px] mt-0.5">${r.tree || ''} tree${r.slot === 0 ? ' — Keystone' : ''}</div>
+                </div>
+            </div>`;
         }
-        html += '</div>';
-        // Divider
-        html += '<div class="w-px h-10 bg-oracle-border/50"></div>';
-        // Secondary tree runes
-        html += '<div class="flex items-center gap-1.5">';
-        secondary.forEach(r => { html += runeImg(r, 'w-9 h-9'); });
-        html += '</div>';
+
+        let html = '<div class="space-y-2">';
+        // Keystone
+        if (runes.keystone) {
+            html += runeEl(runes.keystone, true);
+        }
+        // Primary runes (skip keystone which is index 0)
+        if (primary.length > 1) {
+            html += '<div class="flex flex-wrap gap-x-3 gap-y-1">';
+            primary.slice(1).forEach(r => { html += runeEl(r); });
+            html += '</div>';
+        }
+        // Secondary
+        if (secondary.length > 0) {
+            html += '<div class="flex flex-wrap gap-x-3 gap-y-1 pt-1 border-t border-oracle-border/30">';
+            secondary.forEach(r => { html += runeEl(r); });
+            html += '</div>';
+        }
         html += '</div>';
 
         document.getElementById('runes-content').innerHTML = html;
@@ -551,6 +571,7 @@ function renderDashboard(state) {
                 </div>
                 <div class="flex flex-col items-center gap-0.5">
                     <span class="${style.bg} ${style.text} border ${style.border} text-[10px] px-2 py-0.5 rounded-full font-bold">${style.label}</span>
+                    ${lm.rating_reason ? `<div class="text-oracle-text/40 text-[9px] text-center max-w-[100px] leading-tight">${lm.rating_reason}</div>` : ''}
                     <div class="flex gap-0.5">${badges}</div>
                 </div>
                 <div class="flex items-center gap-2 w-28 justify-end">
@@ -808,14 +829,18 @@ function updateUI(state) {
     }
 }
 
+const IS_DEMO = {% if demo %}true{% else %}false{% endif %};
+const POLL_URL = IS_DEMO ? '/api/game-state/demo' : '/api/game-state';
+if (IS_DEMO) window._oracleNoAutoNav = true;
+
 function poll() {
-    fetch('/api/game-state')
+    fetch(POLL_URL)
         .then(r => r.json())
         .then(updateUI)
         .catch(() => {});
 }
 
 poll();
-setInterval(poll, 3000);
+if (!IS_DEMO) setInterval(poll, 3000);
 </script>
 {% endblock %}

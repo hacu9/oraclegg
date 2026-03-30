@@ -72,6 +72,11 @@ async def in_game_page(request: Request):
     return templates.TemplateResponse(request, "in_game.html")
 
 
+@router.get("/demo", response_class=HTMLResponse)
+async def demo_page(request: Request):
+    return templates.TemplateResponse(request, "in_game.html", {"demo": True})
+
+
 # ─── API Endpoints ───────────────────────────────────────────────────
 
 @router.get("/api/champions")
@@ -407,6 +412,111 @@ async def save_summoner(request: Request):
     # Hot-reload
     settings.summoner_riot_id = riot_id
     return {"ok": True}
+
+
+@router.get("/api/game-state/demo")
+async def demo_game_state():
+    """Return fake game state for demo/preview purposes."""
+    return {
+        "phase": "in_game",
+        "game_time": 1247.5,
+        "active_player": {"name": "Mistyck", "level": 14, "gold": 892},
+        "players": [
+            {"name": "Mistyck", "champion": "Viego", "championIcon": "Viego", "team": "CHAOS", "level": 14, "isDead": False, "respawnTimer": 0,
+             "scores": {"kills": 8, "deaths": 3, "assists": 6, "creepScore": 187, "wardScore": 24},
+             "items": [{"itemID": 6672, "displayName": "Kraken Slayer"}, {"itemID": 6676, "displayName": "The Collector"}, {"itemID": 3111, "displayName": "Mercury's Treads"}, {"itemID": 3036, "displayName": "Lord Dominik's Regards"}]},
+            {"name": "TopDiff99", "champion": "Riven", "championIcon": "Riven", "team": "CHAOS", "level": 13, "isDead": False, "respawnTimer": 0,
+             "scores": {"kills": 5, "deaths": 4, "assists": 3, "creepScore": 201, "wardScore": 18},
+             "items": [{"itemID": 6610, "displayName": "Sundered Sky"}, {"itemID": 6333, "displayName": "Death's Dance"}, {"itemID": 3158, "displayName": "Ionian Boots of Lucidity"}]},
+            {"name": "MidOrFeed", "champion": "Annie", "championIcon": "Annie", "team": "CHAOS", "level": 14, "isDead": False, "respawnTimer": 0,
+             "scores": {"kills": 11, "deaths": 2, "assists": 7, "creepScore": 168, "wardScore": 21},
+             "items": [{"itemID": 3089, "displayName": "Rabadon's Deathcap"}, {"itemID": 3118, "displayName": "Malignance"}, {"itemID": 4645, "displayName": "Shadowflame"}, {"itemID": 3020, "displayName": "Sorcerer's Shoes"}]},
+            {"name": "ADCarry1", "champion": "Jinx", "championIcon": "Jinx", "team": "CHAOS", "level": 12, "isDead": True, "respawnTimer": 18,
+             "scores": {"kills": 6, "deaths": 5, "assists": 9, "creepScore": 195, "wardScore": 15},
+             "items": [{"itemID": 6672, "displayName": "Kraken Slayer"}, {"itemID": 3094, "displayName": "Rapid Firecannon"}, {"itemID": 3031, "displayName": "Infinity Edge"}]},
+            {"name": "SuppDiff", "champion": "Thresh", "championIcon": "Thresh", "team": "CHAOS", "level": 11, "isDead": False, "respawnTimer": 0,
+             "scores": {"kills": 1, "deaths": 3, "assists": 18, "creepScore": 28, "wardScore": 67},
+             "items": [{"itemID": 3190, "displayName": "Locket of the Iron Solari"}, {"itemID": 3222, "displayName": "Mikael's Blessing"}, {"itemID": 3117, "displayName": "Mobility Boots"}]},
+            {"name": "EnemyTop", "champion": "Malphite", "championIcon": "Malphite", "team": "ORDER", "level": 13, "isDead": False, "respawnTimer": 0,
+             "scores": {"kills": 2, "deaths": 5, "assists": 8, "creepScore": 178, "wardScore": 14},
+             "items": [{"itemID": 3143, "displayName": "Randuin's Omen"}, {"itemID": 3075, "displayName": "Thornmail"}, {"itemID": 3047, "displayName": "Plated Steelcaps"}]},
+            {"name": "XxJunglerxX", "champion": "Warwick", "championIcon": "Warwick", "team": "ORDER", "level": 14, "isDead": False, "respawnTimer": 0,
+             "scores": {"kills": 12, "deaths": 2, "assists": 5, "creepScore": 112, "wardScore": 31},
+             "items": [{"itemID": 6631, "displayName": "Stridebreaker"}, {"itemID": 3053, "displayName": "Sterak's Gage"}, {"itemID": 6333, "displayName": "Death's Dance"}, {"itemID": 3065, "displayName": "Spirit Visage"}, {"itemID": 3047, "displayName": "Plated Steelcaps"}]},
+            {"name": "MidLaner2", "champion": "Zed", "championIcon": "Zed", "team": "ORDER", "level": 14, "isDead": True, "respawnTimer": 32,
+             "scores": {"kills": 7, "deaths": 6, "assists": 3, "creepScore": 192, "wardScore": 11},
+             "items": [{"itemID": 6697, "displayName": "Hubris"}, {"itemID": 6676, "displayName": "The Collector"}, {"itemID": 6694, "displayName": "Serylda's Grudge"}]},
+            {"name": "BotLane22", "champion": "Vayne", "championIcon": "Vayne", "team": "ORDER", "level": 13, "isDead": False, "respawnTimer": 0,
+             "scores": {"kills": 4, "deaths": 6, "assists": 2, "creepScore": 210, "wardScore": 13},
+             "items": [{"itemID": 6672, "displayName": "Kraken Slayer"}, {"itemID": 3124, "displayName": "Guinsoo's Rageblade"}, {"itemID": 3006, "displayName": "Berserker's Greaves"}]},
+            {"name": "SuppMain", "champion": "Leona", "championIcon": "Leona", "team": "ORDER", "level": 11, "isDead": False, "respawnTimer": 0,
+             "scores": {"kills": 1, "deaths": 7, "assists": 12, "creepScore": 22, "wardScore": 58},
+             "items": [{"itemID": 3190, "displayName": "Locket of the Iron Solari"}, {"itemID": 3047, "displayName": "Plated Steelcaps"}]},
+        ],
+        "all_tips": [
+            {"id": 1, "priority": 0, "category": "threat", "message": "Warwick is 12/2 — DO NOT fight them alone. Group up or avoid.", "time": 980},
+            {"id": 2, "priority": 0, "category": "build", "message": "Warwick is fed and heals a lot — your team needs anti-heal!", "time": 985},
+            {"id": 3, "priority": 1, "category": "strategy", "message": "Your team has 2 scaling champions. Play safe early, farm up — you outscale them.", "time": 300},
+            {"id": 4, "priority": 1, "category": "build", "message": "Recommended boots: Mercury's Treads — 3 hard CC champions, tenacity is critical", "time": 240},
+            {"id": 5, "priority": 1, "category": "item", "message": "Warwick completed Spirit Visage — increased healing, consider anti-heal", "time": 1100},
+            {"id": 6, "priority": 1, "category": "objective", "message": "Infernal Dragon soul — Must take, extra valuable for your 2 scaling/burst champions", "time": 1200},
+            {"id": 7, "priority": 2, "category": "strategy", "message": "Enemy has better teamfight. Avoid 5v5 — look for picks and split push instead.", "time": 600},
+        ],
+        "tip_version": 7,
+        "post_game_result": None,
+        "map_terrain": "Infernal",
+        "next_dragon": "Infernal",
+        "dragons_taken": 3,
+        "your_champion": "Viego",
+        "your_champion_icon": "Viego",
+        "your_role": "JUNGLE",
+        "enemy_archetypes": ["heavy_ad", "engage"],
+        "build_rec": {
+            "champion": {"name": "Viego", "key": "Viego"},
+            "win_rate": 58.3,
+            "sample_size": 42,
+            "build_path": [
+                {"id": 6672, "name": "Kraken Slayer"},
+                {"id": 6676, "name": "The Collector"},
+                {"id": 3036, "name": "Lord Dominik's Regards"},
+                {"id": 6673, "name": "Immortal Shieldbow"},
+                {"id": 3031, "name": "Infinity Edge"},
+            ],
+            "boots": {"id": 3111, "name": "Mercury's Treads"},
+            "skill_max_order": "Q>W>E",
+        },
+        "strategy": "The enemy team is heavy AD. Armor items are very gold-efficient here. Tabis and an early armor component go a long way.",
+        "lane_matchups": [
+            {"role": "TOP", "ally_champ": "Riven", "ally_icon": "Riven", "enemy_champ": "Malphite", "enemy_icon": "Malphite", "rating": "NEGATIVE", "rating_reason": "Hard matchup — Malphite stacks armor", "enemy_stats": {"rank": "Gold II 45LP", "champ_wr": 62, "champ_games": 34}},
+            {"role": "JUNGLE", "ally_champ": "Viego", "ally_icon": "Viego", "enemy_champ": "Warwick", "enemy_icon": "Warwick", "rating": "NEGATIVE", "rating_reason": "67% WR on this champ (89G)", "enemy_stats": {"rank": "Plat I 78LP", "champ_wr": 67, "champ_games": 89, "one_trick": True}},
+            {"role": "MID", "ally_champ": "Annie", "ally_icon": "Annie", "enemy_champ": "Zed", "enemy_icon": "Zed", "rating": "POSITIVE", "rating_reason": "First-timing this champ", "enemy_stats": {"rank": "Gold IV 12LP", "first_timing": True}},
+            {"role": "ADC", "ally_champ": "Jinx", "ally_icon": "Jinx", "enemy_champ": "Vayne", "enemy_icon": "Vayne", "rating": "EVEN", "rating_reason": "", "enemy_stats": {"rank": "Gold III 55LP", "champ_wr": 51, "champ_games": 22}},
+            {"role": "SUPPORT", "ally_champ": "Thresh", "ally_icon": "Thresh", "enemy_champ": "Leona", "enemy_icon": "Leona", "rating": "POSITIVE", "rating_reason": "Only 38% WR on this champ (16G)", "enemy_stats": {"rank": "Silver I 88LP", "champ_wr": 38, "champ_games": 16, "tilted": True}},
+        ],
+        "runes": {
+            "primary_tree": "Precision",
+            "secondary_tree": "Inspiration",
+            "keystone": {"name": "Conqueror", "icon": "perk-images/Styles/Precision/Conqueror/Conqueror.png", "slot": 0, "tree": "Precision"},
+            "all_runes": [
+                {"name": "Conqueror", "icon": "perk-images/Styles/Precision/Conqueror/Conqueror.png", "slot": 0, "tree": "Precision"},
+                {"name": "Triumph", "icon": "perk-images/Styles/Precision/Triumph.png", "slot": 1, "tree": "Precision"},
+                {"name": "Legend: Alacrity", "icon": "perk-images/Styles/Precision/LegendAlacrity/LegendAlacrity.png", "slot": 2, "tree": "Precision"},
+                {"name": "Last Stand", "icon": "perk-images/Styles/Precision/LastStand/LastStand.png", "slot": 3, "tree": "Precision"},
+                {"name": "Magical Footwear", "icon": "perk-images/Styles/Inspiration/MagicalFootwear/MagicalFootwear.png", "slot": 1, "tree": "Inspiration"},
+                {"name": "Cosmic Insight", "icon": "perk-images/Styles/Inspiration/CosmicInsight/CosmicInsight.png", "slot": 3, "tree": "Inspiration"},
+            ],
+        },
+        "summoner_spells": ["Flash", "Smite"],
+        "win_condition": [
+            {"reason": "Focus ZED mid", "detail": "First-timing Zed, free lane for Annie", "type": "target", "champion": "Zed", "icon": "Zed", "timing": "early"},
+            {"reason": "Avoid WARWICK 1v1", "detail": "OTP with 67% WR, 12/2 this game — group to shut him down", "type": "threat", "champion": "Warwick", "icon": "Warwick", "timing": "all"},
+            {"reason": "Punish LEONA bot", "detail": "38% WR on Leona, tilted — bot lane is free", "type": "target", "champion": "Leona", "icon": "Leona", "timing": "early"},
+            {"reason": "You outscale — play for late", "detail": "Jinx + Viego outscale their comp after 3 items. Don't force early.", "type": "timing", "timing": "late"},
+            {"reason": "Contest Infernal Drake", "detail": "Infernal soul is high value for your 2 scaling carries. Prioritize every dragon.", "type": "carry", "timing": "mid"},
+        ],
+        "scouting_status": "done",
+        "last_update": "2026-03-29T22:30:00",
+    }
 
 
 @router.get("/api/champ-select/live")

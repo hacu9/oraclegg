@@ -4,9 +4,16 @@ Bundled into the .exe. Starts server, opens browser/native window.
 First-run setup (seeding, pipeline) is handled automatically by the server.
 """
 
-import multiprocessing
-import os
+# PyInstaller --windowed: sys.stdout/stderr are None on Windows (no console).
+# Redirect to devnull BEFORE any imports that might print or configure logging.
 import sys
+import os
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, 'w')
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, 'w')
+
+import multiprocessing
 import time
 import webbrowser
 
@@ -52,6 +59,12 @@ def enable_live_client_api():
 
 
 def run_server(port, app_dir):
+    # Subprocess may not inherit the devnull redirect (multiprocessing spawn).
+    # Guard again before importing anything that uses logging or print.
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, 'w')
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, 'w')
     os.environ.setdefault("DB_PATH", os.path.join(app_dir, "data", "oraclegg.db"))
     os.chdir(app_dir)
     from oraclegg.main import app

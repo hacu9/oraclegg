@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import os
+import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -8,11 +10,22 @@ from fastapi.staticfiles import StaticFiles
 from oraclegg.config import settings
 from oraclegg.db.engine import init_db
 
-# Configure logging for all oraclegg modules
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(name)s %(levelname)s %(message)s",
-)
+# Configure logging for all oraclegg modules.
+# When running as a PyInstaller --windowed app, sys.stderr is None so the
+# default StreamHandler would crash. Use a file handler in that case.
+if sys.stderr is None:
+    _log_dir = os.path.dirname(os.environ.get("DB_PATH", "oraclegg.db"))
+    os.makedirs(_log_dir, exist_ok=True)
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(name)s %(levelname)s %(message)s",
+        handlers=[logging.FileHandler(os.path.join(_log_dir, "oraclegg.log"))],
+    )
+else:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(name)s %(levelname)s %(message)s",
+    )
 
 
 @asynccontextmanager

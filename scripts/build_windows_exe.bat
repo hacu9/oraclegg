@@ -23,7 +23,7 @@ build_venv\Scripts\pip install -q pyinstaller httpx fastapi uvicorn[standard] ai
 
 REM Run PyInstaller
 echo  [3/4] Building .exe (this takes 1-2 minutes)...
-build_venv\Scripts\pyinstaller --noconfirm --name OracleGG --console ^
+build_venv\Scripts\pyinstaller --noconfirm --name OracleGG --windowed ^
     --add-data "src\oraclegg\ui;oraclegg\ui" ^
     --hidden-import oraclegg.main ^
     --hidden-import oraclegg.api.routes ^

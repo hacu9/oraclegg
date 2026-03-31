@@ -105,7 +105,7 @@ def main():
             width=1100,
             height=800,
             min_size=(800, 600),
-            on_top=True,
+            on_top=False,
             text_select=False,
         )
         webview.start()  # Blocks until window closed

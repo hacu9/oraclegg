@@ -18,7 +18,7 @@ import httpx
 logger = logging.getLogger(__name__)
 
 VERSION = "0.4.0"
-GITHUB_REPO = "cabello986/oraclegg"
+GITHUB_REPO = "hacu9/oraclegg"
 UPDATE_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 
 # Files to preserve during update (user data)
